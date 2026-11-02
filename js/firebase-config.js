@@ -1,49 +1,6 @@
-/*
- * ============================================================
- * NEXO 3D
- * CONFIGURAÇÃO DO FIREBASE
- * ============================================================
- *
- * IMPORTANTE:
- *
- * Substitua os valores abaixo pelos dados fornecidos
- * pelo Firebase Console.
- *
- * NÃO coloque neste arquivo:
- *
- * - senha de usuário
- * - chave privada
- * - serviceAccountKey.json
- * - tokens administrativos
- *
- * A configuração Web do Firebase pode ficar no código
- * do navegador. A proteção dos dados deve ser feita
- * através das Security Rules.
- *
- * ============================================================
- */
-const app = initializeApp(firebaseConfig);
-
-import {
-    initializeApp
-} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
-
-
-import {
-    getAuth
-} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
-
-
-import {
-    getDatabase
-} from "https://www.gstatic.com/firebasejs/13.1.0/firebase-database.js";
-
-
-/*
- * ============================================================
- * CONFIGURAÇÃO
- * ============================================================
- */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-auth.js";
+import { getDatabase } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB78tR4k9cvxMphp7zRxgqhyXYumHc9Ets",
@@ -53,34 +10,10 @@ const firebaseConfig = {
   storageBucket: "nexo3dstm-b42d2.firebasestorage.app",
   messagingSenderId: "834864378318",
   appId: "1:834864378318:web:e854b68c6be1d146ddbb9f"
-
 };
 
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const database = getDatabase(app);
 
-/*
- * ============================================================
- * INICIALIZAÇÃO
- * ============================================================
- */
-
-const app =
-    initializeApp(firebaseConfig);
-
-
-const auth =
-    getAuth(app);
-
-
-const database =
-    getDatabase(app);
-
-
-/*
- * Exportamos os serviços para os outros arquivos.
- */
-
-export {
-    app,
-    auth,
-    database
-};
+export { app, auth, database };
