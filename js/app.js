@@ -69,7 +69,7 @@ let produtoEditandoId =
  */
 
 document.addEventListener(
-    "DOMContentLoaded",
+    "usuarioAutenticado",
     iniciar
 );
 
