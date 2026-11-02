@@ -1,13 +1,4 @@
 
-const firebaseConfig = {
-  apiKey: "AIzaSyB78tR4k9cvxMphp7zRxgqhyXYumHc9Ets",
-  authDomain: "nexo3dstm-b42d2.firebaseapp.com",
-  projectId: "nexo3dstm-b42d2",
-  storageBucket: "nexo3dstm-b42d2.firebasestorage.app",
-  messagingSenderId: "834864378318",
-  appId: "1:834864378318:web:e854b68c6be1d146ddbb9f"
-};
-
 import {
     initializeApp
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-app.js";
@@ -30,27 +21,12 @@ import {
  */
 
 const firebaseConfig = {
-
-    apiKey: "COLOQUE_SUA_API_KEY_AQUI",
-
-    authDomain:
-        "SEU-PROJETO.firebaseapp.com",
-
-    databaseURL:
-        "https://SEU-PROJETO-default-rtdb.firebaseio.com",
-
-    projectId:
-        "SEU-PROJETO",
-
-    storageBucket:
-        "SEU-PROJETO.firebasestorage.app",
-
-    messagingSenderId:
-        "SEU_MESSAGING_SENDER_ID",
-
-    appId:
-        "SEU_APP_ID"
-
+  apiKey: "AIzaSyB78tR4k9cvxMphp7zRxgqhyXYumHc9Ets",
+  authDomain: "nexo3dstm-b42d2.firebaseapp.com",
+  projectId: "nexo3dstm-b42d2",
+  storageBucket: "nexo3dstm-b42d2.firebasestorage.app",
+  messagingSenderId: "834864378318",
+  appId: "1:834864378318:web:e854b68c6be1d146ddbb9f"
 };
 
 
