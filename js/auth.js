@@ -127,37 +127,36 @@ logoutButton.addEventListener(
  * ============================================================
  */
 
+let sistemaInicializado = false;
+
 onAuthStateChanged(
     auth,
     (user) => {
 
         if (user) {
 
-            loginScreen.classList.add(
-                "hidden"
-            );
-
-            app.classList.remove(
-                "hidden"
-            );
-
+            loginScreen.classList.add("hidden");
+            app.classList.remove("hidden");
 
             if (userEmail) {
-
                 userEmail.textContent =
                     user.email || "Usuário";
+            }
 
+            if (!sistemaInicializado) {
+                sistemaInicializado = true;
+
+                window.dispatchEvent(
+                    new Event("usuarioAutenticado")
+                );
             }
 
         } else {
 
-            loginScreen.classList.remove(
-                "hidden"
-            );
+            sistemaInicializado = false;
 
-            app.classList.add(
-                "hidden"
-            );
+            loginScreen.classList.remove("hidden");
+            app.classList.add("hidden");
 
         }
 
