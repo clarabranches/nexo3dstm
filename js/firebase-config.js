@@ -22,7 +22,7 @@
  *
  * ============================================================
  */
-
+const app = initializeApp(firebaseConfig);
 
 import {
     initializeApp
