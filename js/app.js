@@ -370,61 +370,35 @@ function abrirAba(tab) {
  */
 
 function configurarAcoes() {
-
-    document.addEventListener(
-        "click",
-        (event) => {
-
-            const action =
-                event.target.closest(
-                    "[data-action]"
-                );
-
-
-            if (action) {
-
-                executarAcao(
-                    action.dataset.action
-                );
-
-                return;
-
-            }
-
-
-            const card =
-                event.target.closest(
-                    ".product-card"
-                );
-
-
-            if (card) {
-
-                abrirEdicaoProduto(
-                    card.dataset.productId
-                );
-
-                return;
-
-            }
-
-
-            const recente =
-                event.target.closest(
-                    ".recent-item"
-                );
-
-
-            if (recente) {
-
-                abrirEdicaoProduto(
-                    recente.dataset.productId
-                );
-
-            }
-
+    document.addEventListener("click", (event) => {
+        const action = event.target.closest("[data-action]");
+        if (action) {
+            executarAcao(action.dataset.action);
+            return;
         }
-    );
+
+        const card = event.target.closest(".product-card");
+        if (card) {
+            abrirEdicaoProduto(card.dataset.productid);
+            return;
+        }
+
+        const recente = event.target.closest(".recent-item");
+        if (recente) {
+            abrirEdicaoProduto(recente.dataset.productid);
+            return;
+        }
+    });
+
+    document.getElementById("clear-product-form")?.addEventListener("click", () => {
+        limparFormularioProduto();
+    });
+
+    document.getElementById("cancel-product")?.addEventListener("click", () => {
+        limparFormularioProduto();
+        abrirAba("produtos");
+    });
+}
 
 
     document.getElementById(
