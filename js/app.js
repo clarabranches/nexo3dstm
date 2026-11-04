@@ -273,7 +273,6 @@ function configurarAcoes() {
         limparFormularioProduto();
         abrirAba("produtos");
     });
-}
 
 
     document.getElementById(
