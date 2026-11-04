@@ -68,186 +68,61 @@ let produtoEditandoId =
  * ============================================================
  */
 
-document.addEventListener(
-    "usuarioAutenticado",
-    iniciar
-);
-
+document.addEventListener("usuarioAutenticado", iniciar);
 
 async function iniciar() {
-
     configurarMenu();
-
     configurarAcoes();
-
     configurarFormularioProduto();
-
     configurarConfiguracoes();
-
     configurarFilamentos();
-
     configurarCategorias();
-
     configurarFiltros();
-
     configurarUploadImagem();
-
     adicionarLinhaFilamento();
-
-
     await carregarDados();
-
-
-    observarProdutos(
-        (dados) => {
-
-            produtos =
-                dados || {};
-
-
-            atualizarInterface();
-
-        }
-    );
-
+    observarProdutos((dados) => {
+        produtos = dados || {};
+        atualizarInterface();
+    });
 }
-
-
-/*
- * ============================================================
- * CARREGAR DADOS
- * ============================================================
- */
 
 async function carregarDados() {
-
     try {
-
-        const [
-            categoriasSnapshot,
-            filamentosSnapshot,
-            configuracoesSnapshot
-        ] = await Promise.all([
-
-            get(
-                ref(
-                    database,
-                    "categorias"
-                )
-            ),
-
-            get(
-                ref(
-                    database,
-                    "filamentos"
-                )
-            ),
-
-            get(
-                ref(
-                    database,
-                    "configuracoes"
-                )
-            )
-
+        const [categoriasSnapshot, filamentosSnapshot, configuracoesSnapshot] = await Promise.all([
+            get(ref(database, "categorias")),
+            get(ref(database, "filamentos")),
+            get(ref(database, "configuracoes"))
         ]);
 
-
-        categorias =
-            categoriasSnapshot.val() || {};
-
-
-        filamentos =
-            filamentosSnapshot.val() || {};
-
-
-        configuracoes =
-            configuracoesSnapshot.val() || {};
-
+        categorias = categoriasSnapshot.val() || {};
+        filamentos = filamentosSnapshot.val() || {};
+        configuracoes = configuracoesSnapshot.val() || {};
 
         atualizarCategorias();
-
         atualizarFilamentos();
-
         carregarConfiguracoes();
-
         atualizarInterface();
-
-
     } catch (error) {
-
-        console.error(
-            "Erro ao carregar dados:",
-            error
-        );
-
-
-        mostrarToast(
-            "Erro ao carregar os dados."
-        );
-
+        console.error("Erro ao carregar dados:", error);
+        mostrarToast("Erro ao carregar os dados.");
     }
-
 }
 
-
-/*
- * ============================================================
- * MENU
- * ============================================================
- */
-
 function configurarMenu() {
+    const botoes = document.querySelectorAll(".menu-item");
+    botoes.forEach((botao) => {
+        botao.addEventListener("click", () => {
+            const tab = botao.dataset.tab;
+            abrirAba(tab);
+        });
+    });
 
-    const botoes =
-        document.querySelectorAll(
-            ".menu-item"
-        );
-
-
-    botoes.forEach(
-        (botao) => {
-
-            botao.addEventListener(
-                "click",
-                () => {
-
-                    const tab =
-                        botao.dataset.tab;
-
-
-                    abrirAba(tab);
-
-                }
-            );
-
-        }
-    );
-
-
-    const mobileButton =
-        document.getElementById(
-            "mobile-menu-button"
-        );
-
-
-    const sidebar =
-        document.querySelector(
-            ".sidebar"
-        );
-
-
-    mobileButton?.addEventListener(
-        "click",
-        () => {
-
-            sidebar.classList.toggle(
-                "mobile-open"
-            );
-
-        }
-    );
-
+    const mobileButton = document.getElementById("mobile-menu-button");
+    const sidebar = document.querySelector(".sidebar");
+    mobileButton?.addEventListener("click", () => {
+        sidebar.classList.toggle("mobile-open");
+    });
 }
 
 
