@@ -128,113 +128,59 @@ function configurarMenu() {
 
 function abrirAba(tab) {
 
-    document
-        .querySelectorAll(
-            ".tab-content"
-        )
-        .forEach(
-            (elemento) => {
+    // Remove a classe active de todas as abas
+    document.querySelectorAll(".tab-content").forEach((elemento) => {
+        elemento.classList.remove("active");
+    });
 
-                elemento.classList.remove(
-                    "active"
-                );
-
-            }
-        );
-
-
-    const alvo =
-        document.getElementById(
-            `tab-${tab}`
-        );
-
+    // Ativa a aba selecionada
+    const alvo = document.getElementById(`tab-${tab}`);
 
     if (alvo) {
-
-        alvo.classList.add(
-            "active"
-        );
-
+        alvo.classList.add("active");
     }
 
-
-    document
-        .querySelectorAll(
-            ".menu-item"
-        )
-        .forEach(
-            (botao) => {
-
-                botao.classList.toggle(
-                    "active",
-                    botao.dataset.tab === tab
-                );
-
-            }
+    // Atualiza o botão selecionado no menu
+    document.querySelectorAll(".menu-item").forEach((botao) => {
+        botao.classList.toggle(
+            "active",
+            botao.dataset.tab === tab
         );
+    });
 
-
+    // Títulos das páginas
     const titulos = {
+        dashboard: [
+            "Visão geral",
+            "Acompanhe os produtos e a produção."
+        ],
 
-        dashboard:
-            [
-                "Visão geral",
-                "Acompanhe os produtos e a produção."
-            ],
+        produtos: [
+            "Produtos",
+            "Consulte e gerencie os produtos da loja."
+        ],
 
-        produtos:
-            [
-                "Produtos",
-                "Consulte e gerencie os produtos da loja."
-            ],
+        cadastro: [
+            produtoEditandoId ? "Editar produto" : "Novo produto",
+            "Cadastre ou edite um produto."
+        ],
 
-        cadastro:
-            [
-                produtoEditandoId
-                    ? "Editar produto"
-                    : "Novo produto",
-                "Cadastre ou edite um produto."
-            ],
-
-        configuracoes:
-            [
-                "Configurações",
-                "Gerencie custos, categorias e filamentos."
-            ]
-
+        configuracoes: [
+            "Configurações",
+            "Gerencie custos, categorias e filamentos."
+        ]
     };
 
-
-    const titulo =
-        titulos[tab];
-
+    const titulo = titulos[tab];
 
     if (titulo) {
-
-        document.getElementById(
-            "page-title"
-        ).textContent =
-            titulo[0];
-
-
-        document.getElementById(
-            "page-subtitle"
-        ).textContent =
-            titulo[1];
-
+        document.getElementById("page-title").textContent = titulo[0];
+        document.getElementById("page-subtitle").textContent = titulo[1];
     }
 
-
-    const sidebar =
-        document.querySelector(
-            ".sidebar"
-        );
-
-
-    sidebar?.classList.remove(
-        "mobile-open"
-    );
-
+    // Fecha o menu mobile
+    const sidebar = document.querySelector(".sidebar");
+    sidebar?.classList.remove("mobile-open");
 }
 
 
