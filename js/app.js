@@ -1849,324 +1849,205 @@ function atualizarLocais() {
  */
 
 function configurarEstoque() {
+  const form = document.getElementById("product-form");
+  if (!form || document.getElementById("inventory-management")) {
+    return;
+  }
 
-    const abaProdutos =
-        document.getElementById("tab-produtos");
+  const painel = document.createElement("div");
+  painel.id = "inventory-management";
+  painel.className = "panel";
+  painel.innerHTML = `
+    <div class="panel-header">
+      <div>
+        <h3>Estoque deste produto</h3>
+        <p>Adicione unidades, registre vendas e transfira entre locais.</p>
+      </div>
+    </div>
 
-    if (!abaProdutos) {
-        return;
+    <div id="inventory-empty">
+      <p>Salve o produto primeiro para controlar o estoque dele.</p>
+    </div>
 
+    <div id="inventory-content">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="inventory-color">Cor / variação</label>
+          <select id="inventory-color">
+            <option value="__sem_cor">Sem variação</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="inventory-location">Local</label>
+          <select id="inventory-location">
+            <option value="">Selecione um local</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="inventory-quantity">Quantidade</label>
+          <input id="inventory-quantity" type="number" min="1" step="1" value="1">
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-primary" id="inventory-add">
+          Adicionar ao estoque
+        </button>
+        <button type="button" class="btn btn-danger" id="inventory-sale">
+          Registrar venda / baixar estoque
+        </button>
+      </div>
+
+      <div id="inventory-summary" class="inventory-summary"></div>
+
+      <div class="transfer-panel" style="margin-top:24px;">
+        <h4>Transferência entre locais</h4>
+        <p>Move unidades de um local para outro sem alterar o total.</p>
+
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="transfer-color">Cor / variação</label>
+            <select id="transfer-color">
+              <option value="__sem_cor">Sem variação</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="transfer-from">Local de origem</label>
+            <select id="transfer-from">
+              <option value="">Selecione a origem</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="transfer-to">Local de destino</label>
+            <select id="transfer-to">
+              <option value="">Selecione o destino</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="transfer-quantity">Quantidade</label>
+            <input id="transfer-quantity" type="number" min="1" step="1" value="1">
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-primary" id="transfer-submit">
+            Transferir estoque
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Fica logo acima dos botões Cancelar / Salvar produto
+  const botoes = document.getElementById("cancel-product")?.closest(".form-actions");
+  if (botoes && botoes.parentElement) {
+    botoes.parentElement.insertBefore(painel, botoes);
+  } else {
+    form.appendChild(painel);
+  }
+
+  // Enter dentro do painel não pode salvar o produto sem querer
+  painel.addEventListener("keydown", (evento) => {
+    if (evento.key === "Enter") {
+      evento.preventDefault();
     }
-
-    let painel =
-        document.getElementById("inventory-management");
-
-    if (!painel) {
-
-        painel = document.createElement("section");
-
-        painel.id = "inventory-management";
-
-        painel.className = "settings-section";
-
-        painel.innerHTML = `
-
-            <div class="section-header">
-
-                <div>
-
-                    <h2>Estoque e vendas</h2>
-
-                    <p>
-                        Adicione unidades ao estoque ou registre uma venda
-                        escolhendo produto, cor e local.
-                    </p>
-
-                </div>
-
-            </div>
-
-            <div class="form-grid">
-
-                <div class="form-group">
-
-                    <label for="inventory-product">
-                        Produto
-                    </label>
-
-                    <select id="inventory-product">
-
-                        <option value="">
-                            Selecione um produto
-                        </option>
-
-                    </select>
-
-                </div>
-
-                <div class="form-group">
-
-                    <label for="inventory-color">
-                        Cor / variação
-                    </label>
-
-                    <select id="inventory-color">
-
-                        <option value="__sem_cor">
-                            Sem variação
-                        </option>
-
-                    </select>
-
-                </div>
-
-                <div class="form-group">
-
-                    <label for="inventory-location">
-                        Local
-                    </label>
-
-                    <select id="inventory-location">
-
-                        <option value="">
-                            Selecione um local
-                        </option>
-
-                    </select>
-
-                </div>
-
-                <div class="form-group">
-
-                    <label for="inventory-quantity">
-                        Quantidade
-                    </label>
-
-                    <input
-                        id="inventory-quantity"
-                        type="number"
-
-                        min="1"
-                        step="1"
-                        value="1"
-                    >
-
-                </div>
-
-            </div>
-
-            <div class="form-actions">
-
-                <button
-                    type="button"
-                    class="btn btn-primary"
-                    id="inventory-add">
-
-                    Adicionar ao estoque
-
-                </button>
-
-                <button
-                    type="button"
-                    class="btn btn-danger"
-                    id="inventory-sale">
-
-                    Registrar venda / baixar estoque
-
-                </button>
-
-            </div>
-
-            <div
-                id="inventory-summary"
-                class="inventory-summary">
-            </div>
-
-            <div class="panel transfer-panel" style="margin-top:24px;">
-                <div class="panel-header">
-                    <div>
-                        <h3>Transferência de estoque</h3>
-                        <p>Transfira unidades entre locais sem alterar o estoque total.</p>
-                    </div>
-                </div>
-
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="transfer-product">Produto</label>
-                        <select id="transfer-product">
-                            <option value="">Selecione um produto</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="transfer-color">Cor / variação</label>
-                        <select id="transfer-color">
-                            <option value="__sem_cor">Sem variação</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="transfer-from">Local de origem</label>
-                        <select id="transfer-from">
-                            <option value="">Selecione a origem</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="transfer-to">Local de destino</label>
-                        <select id="transfer-to">
-                            <option value="">Selecione o destino</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="transfer-quantity">Quantidade</label>
-                        <input id="transfer-quantity" type="number" min="1" step="1" value="1">
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <button type="button" class="btn btn-primary" id="transfer-submit">
-                        Transferir estoque
-                    </button>
-                </div>
-            </div>
-
-        `;
-
-        const grade =
-            document.getElementById("products-grid");
-
-        if (grade?.parentElement) {
-
-            grade.parentElement.insertBefore(
-                painel,
-                grade
-            );
-
-        } else {
-
-            abaProdutos.appendChild(painel);
-
-        }
-
-    }
-
-    document.getElementById("inventory-product")?.addEventListener(
-        "change",
-        atualizarOpcoesCoresEstoque
-    );
-
-    document.getElementById("inventory-add")?.addEventListener(
-        "click",
-        () => movimentarEstoque("entrada")
-    );
-
-    document.getElementById("inventory-sale")?.addEventListener(
-        "click",
-        () => movimentarEstoque("venda")
-    );
-
-    document.getElementById("transfer-product")?.addEventListener(
-        "change",
-        atualizarOpcoesCoresTransferencia
-    );
-
-    document.getElementById("transfer-submit")?.addEventListener(
-        "click",
-        transferirEstoque
-    );
-
-    atualizarPainelEstoque();
-
+  });
+
+  document.getElementById("inventory-color")
+    ?.addEventListener("change", renderizarResumoEstoque);
+  document.getElementById("inventory-add")
+    ?.addEventListener("click", () => movimentarEstoque("entrada"));
+  document.getElementById("inventory-sale")
+    ?.addEventListener("click", () => movimentarEstoque("venda"));
+  document.getElementById("transfer-submit")
+    ?.addEventListener("click", transferirEstoque);
+
+  atualizarPainelEstoque();
 }
 
-function atualizarPainelTransferencia() {
+function atualizarPainelEstoque() {
+  const painel = document.getElementById("inventory-management");
+  if (!painel) {
+    return;
+  }
 
-    const selectProduto = document.getElementById("transfer-product");
-    const selectOrigem = document.getElementById("transfer-from");
-    const selectDestino = document.getElementById("transfer-to");
+  const editando = Boolean(
+    produtoEditandoId && produtos[produtoEditandoId]
+  );
 
-    if (!selectProduto || !selectOrigem || !selectDestino) {
-        return;
+  document.getElementById("inventory-empty").style.display =
+    editando ? "none" : "";
+  document.getElementById("inventory-content").style.display =
+    editando ? "" : "none";
+
+  if (!editando) {
+    return;
+  }
+
+  const opcoesLocais = Object.entries(locais).map(([id, local]) => `
+    <option value="${escaparHTML(id)}">
+      ${escaparHTML(local.nome || "Local")}
+    </option>
+  `).join("");
+
+  [
+    ["inventory-location", "Selecione um local"],
+    ["transfer-from", "Selecione a origem"],
+    ["transfer-to", "Selecione o destino"]
+  ].forEach(([selectId, rotulo]) => {
+    const select = document.getElementById(selectId);
+    if (!select) {
+      return;
     }
-
-    const produtoAtual = selectProduto.value;
-    const origemAtual = selectOrigem.value;
-    const destinoAtual = selectDestino.value;
-
-    selectProduto.innerHTML = `
-        <option value="">Selecione um produto</option>
-        ${Object.entries(produtos).map(([id, produto]) => `
-            <option value="${escaparHTML(id)}">
-                ${escaparHTML(produto.nome || "Produto sem nome")}
-            </option>
-        `).join("")}
-    `;
-
-    selectOrigem.innerHTML = `
-        <option value="">Selecione a origem</option>
-        ${Object.entries(locais).map(([id, local]) => `
-            <option value="${escaparHTML(id)}">
-                ${escaparHTML(local.nome || "Local")}
-            </option>
-        `).join("")}
-    `;
-
-    selectDestino.innerHTML = `
-        <option value="">Selecione o destino</option>
-        ${Object.entries(locais).map(([id, local]) => `
-            <option value="${escaparHTML(id)}">
-                ${escaparHTML(local.nome || "Local")}
-            </option>
-        `).join("")}
-    `;
-
-    if (produtos[produtoAtual]) {
-        selectProduto.value = produtoAtual;
+    const atual = select.value;
+    select.innerHTML = `<option value="">${rotulo}</option>${opcoesLocais}`;
+    if (locais[atual]) {
+      select.value = atual;
     }
-    if (locais[origemAtual]) {
-        selectOrigem.value = origemAtual;
-    }
-    if (locais[destinoAtual]) {
-        selectDestino.value = destinoAtual;
-    }
+  });
 
-    atualizarOpcoesCoresTransferencia();
+  atualizarOpcoesCoresEstoque();
+  atualizarOpcoesCoresTransferencia();
+}
 
+function preencherSelectCores(selectId) {
+  const select = document.getElementById(selectId);
+  if (!select) {
+    return;
+  }
+
+  const cores = obterCoresProduto(produtos[produtoEditandoId]);
+  const atual = select.value;
+
+  if (!cores.length) {
+    select.innerHTML = `<option value="__sem_cor">Sem variação</option>`;
+    select.value = "__sem_cor";
+    return;
+  }
+
+  select.innerHTML = cores.map(cor => `
+    <option value="${escaparHTML(chaveCorEstoque(cor))}">
+      ${escaparHTML(cor)}
+    </option>
+  `).join("");
+
+  if (cores.some(cor => chaveCorEstoque(cor) === atual)) {
+    select.value = atual;
+  }
+}
+
+function atualizarOpcoesCoresEstoque() {
+  preencherSelectCores("inventory-color");
+  renderizarResumoEstoque();
 }
 
 function atualizarOpcoesCoresTransferencia() {
-
-    const selectProduto = document.getElementById("transfer-product");
-    const selectCor = document.getElementById("transfer-color");
-
-    if (!selectProduto || !selectCor) {
-        return;
-    }
-
-    const produto = produtos[selectProduto.value];
-    const corAtual = selectCor.value;
-    const cores = obterCoresProduto(produto);
-
-    if (!cores.length) {
-        selectCor.innerHTML = `
-            <option value="__sem_cor">Sem variação</option>
-        `;
-        selectCor.value = "__sem_cor";
-        return;
-    }
-
-    selectCor.innerHTML = cores.map(cor => `
-        <option value="${escaparHTML(chaveCorEstoque(cor))}">
-            ${escaparHTML(cor)}
-        </option>
-    `).join("");
-
-    if (cores.some(cor => chaveCorEstoque(cor) === corAtual)) {
-        selectCor.value = corAtual;
-    }
-
+  preencherSelectCores("transfer-color");
 }
 
 async function transferirEstoque() {
@@ -2299,121 +2180,6 @@ function obterCoresProduto(produto) {
 
 }
 
-function atualizarPainelEstoque() {
-
-    const selectProduto =
-        document.getElementById("inventory-product");
-
-    const selectLocal =
-        document.getElementById("inventory-location");
-
-    if (!selectProduto || !selectLocal) {
-        return;
-    }
-
-    const produtoAtual = selectProduto.value;
-    const localAtual = selectLocal.value;
-
-    selectProduto.innerHTML = `
-
-        <option value="">
-            Selecione um produto
-        </option>
-
-        ${Object.entries(produtos)
-
-            .map(([id, produto]) => `
-
-                <option value="${escaparHTML(id)}">
-                    ${escaparHTML(produto.nome || "Produto sem nome")}
-                </option>
-
-            `)
-            .join("")}
-
-    `;
-
-    if (produtos[produtoAtual]) {
-        selectProduto.value = produtoAtual;
-    }
-
-    selectLocal.innerHTML = `
-
-        <option value="">
-            Selecione um local
-        </option>
-
-        ${Object.entries(locais)
-            .map(([id, local]) => `
-
-                <option value="${escaparHTML(id)}">
-                    ${escaparHTML(local.nome || "Local")}
-                </option>
-
-            `)
-            .join("")}
-
-    `;
-
-    if (locais[localAtual]) {
-        selectLocal.value = localAtual;
-    }
-
-    atualizarOpcoesCoresEstoque();
-    atualizarPainelTransferencia();
-
-    renderizarResumoEstoque();
-
-}
-
-function atualizarOpcoesCoresEstoque() {
-
-    const selectProduto =
-        document.getElementById("inventory-product");
-
-    const selectCor =
-        document.getElementById("inventory-color");
-
-    if (!selectProduto || !selectCor) {
-        return;
-    }
-
-    const produto = produtos[selectProduto.value];
-
-    const corAtual = selectCor.value;
-
-    const cores = obterCoresProduto(produto);
-
-    if (!cores.length) {
-
-        selectCor.innerHTML = `
-            <option value="__sem_cor">
-                Sem variação
-            </option>
-        `;
-
-        selectCor.value = "__sem_cor";
-
-        renderizarResumoEstoque();
-
-        return;
-    }
-
-    selectCor.innerHTML = cores.map(cor => `
-
-        <option value="${escaparHTML(chaveCorEstoque(cor))}">
-            ${escaparHTML(cor)}
-        </option>
-
-    `).join("");
-
-    if (cores.some(cor => chaveCorEstoque(cor) === corAtual)) {
-        selectCor.value = corAtual;
-    }
-
-    renderizarResumoEstoque();
-
-}
 
 function quantidadeEstoque(produtoId, corKey, localId) {
 
