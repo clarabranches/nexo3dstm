@@ -68,7 +68,7 @@ let produtoEditandoId =
  * ============================================================
  */
 
-document.addEventListener("usuarioAutenticado", iniciar);
+window.addEventListener("usuarioAutenticado", iniciar);
 
 async function iniciar() {
     configurarMenu();
