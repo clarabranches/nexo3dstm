@@ -9,7 +9,8 @@ import {
     set,
     push,
     update,
-    remove
+    remove,
+    runTransaction
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-database.js";
 
 
@@ -51,6 +52,8 @@ let filamentos = {};
 let configuracoes = {};
 let produtoEditandoId = null;
 let locais = {};
+let estoquePorProduto = {};
+
 
 /*
  * ============================================================
@@ -66,17 +69,21 @@ async function iniciar() {
     configurarFormularioProduto();
     configurarConfiguracoes();
     configurarLocais();
+    configurarEstoque();
     configurarFilamentos();
     configurarCategorias();
     configurarFiltros();
     configurarUploadImagem();
     adicionarLinhaFilamento();
+
     await carregarDados();
+
     observarProdutos((dados) => {
         produtos = dados || {};
         atualizarInterface();
     });
 }
+
 
 async function carregarDados() {
     try {
@@ -84,18 +91,21 @@ async function carregarDados() {
             categoriasSnapshot,
             filamentosSnapshot,
             configuracoesSnapshot,
-            locaisSnapshot
+            locaisSnapshot,
+            estoqueSnapshot
         ] = await Promise.all([
             get(ref(database, "categorias")),
             get(ref(database, "filamentos")),
             get(ref(database, "configuracoes")),
-            get(ref(database, "locais"))
+            get(ref(database, "locais")),
+            get(ref(database, "estoque"))
         ]);
 
         categorias = categoriasSnapshot.val() || {};
         filamentos = filamentosSnapshot.val() || {};
         configuracoes = configuracoesSnapshot.val() || {};
         locais = locaisSnapshot.val() || {};
+        estoquePorProduto = estoqueSnapshot.val() || {};
 
         atualizarCategorias();
         atualizarFilamentos();
@@ -109,8 +119,10 @@ async function carregarDados() {
     }
 }
 
+
 function configurarMenu() {
     const botoes = document.querySelectorAll(".menu-item");
+
     botoes.forEach((botao) => {
         botao.addEventListener("click", () => {
             const tab = botao.dataset.tab;
@@ -120,6 +132,7 @@ function configurarMenu() {
 
     const mobileButton = document.getElementById("mobile-menu-button");
     const sidebar = document.querySelector(".sidebar");
+
     mobileButton?.addEventListener("click", () => {
         sidebar.classList.toggle("mobile-open");
     });
@@ -128,19 +141,16 @@ function configurarMenu() {
 
 function abrirAba(tab) {
 
-    // Remove a classe active de todas as abas
     document.querySelectorAll(".tab-content").forEach((elemento) => {
         elemento.classList.remove("active");
     });
 
-    // Ativa a aba selecionada
     const alvo = document.getElementById(`tab-${tab}`);
 
     if (alvo) {
         alvo.classList.add("active");
     }
 
-    // Atualiza o botão selecionado no menu
     document.querySelectorAll(".menu-item").forEach((botao) => {
         botao.classList.toggle(
             "active",
@@ -148,7 +158,6 @@ function abrirAba(tab) {
         );
     });
 
-    // Títulos das páginas
     const titulos = {
         dashboard: [
             "Visão geral",
@@ -157,7 +166,7 @@ function abrirAba(tab) {
 
         produtos: [
             "Produtos",
-            "Consulte e gerencie os produtos da loja."
+            "Consulte produtos, estoque por local e vendas."
         ],
 
         cadastro: [
@@ -167,7 +176,7 @@ function abrirAba(tab) {
 
         configuracoes: [
             "Configurações",
-            "Gerencie custos, categorias e filamentos."
+            "Gerencie custos, categorias, filamentos e locais de estoque."
         ]
     };
 
@@ -178,7 +187,6 @@ function abrirAba(tab) {
         document.getElementById("page-subtitle").textContent = titulo[1];
     }
 
-    // Fecha o menu mobile
     const sidebar = document.querySelector(".sidebar");
     sidebar?.classList.remove("mobile-open");
 }
@@ -191,86 +199,60 @@ function abrirAba(tab) {
  */
 
 function configurarAcoes() {
+
     document.addEventListener("click", (event) => {
+
         const action = event.target.closest("[data-action]");
+
         if (action) {
             executarAcao(action.dataset.action);
             return;
         }
 
         const card = event.target.closest(".product-card");
+
         if (card) {
             abrirEdicaoProduto(card.dataset.productid);
             return;
         }
 
         const recente = event.target.closest(".recent-item");
+
         if (recente) {
             abrirEdicaoProduto(recente.dataset.productid);
-            return;
         }
     });
 
-    document.getElementById("clear-product-form")?.addEventListener("click", () => {
-        limparFormularioProduto();
-    });
-
-    document.getElementById("cancel-product")?.addEventListener("click", () => {
-        limparFormularioProduto();
-        abrirAba("produtos");
-    });
-
-
-    document.getElementById(
-        "clear-product-form"
-    )?.addEventListener(
+    document.getElementById("clear-product-form")?.addEventListener(
         "click",
         limparFormularioProduto
     );
 
-
-    document.getElementById(
-        "cancel-product"
-    )?.addEventListener(
+    document.getElementById("cancel-product")?.addEventListener(
         "click",
         () => {
-
             limparFormularioProduto();
-
             abrirAba("produtos");
-
         }
     );
-
 }
 
 
-function executarAcao(
-    action
-) {
+function executarAcao(action) {
 
     switch (action) {
 
         case "novo-produto":
-
             limparFormularioProduto();
-
             abrirAba("cadastro");
-
             break;
-
 
         case "produtos":
-
             abrirAba("produtos");
-
             break;
 
-
         case "configuracoes":
-
             abrirAba("configuracoes");
-
             break;
 
     }
@@ -287,8 +269,8 @@ function executarAcao(
 function atualizarInterface() {
 
     atualizarListaProdutos();
-
     atualizarDashboard();
+    atualizarPainelEstoque();
 
 }
 
@@ -296,138 +278,58 @@ function atualizarInterface() {
 function atualizarListaProdutos() {
 
     const container =
-        document.getElementById(
-            "products-grid"
-        );
+        document.getElementById("products-grid");
 
-
-    const busca =
-        (
-            document.getElementById(
-                "product-search"
-            )?.value || ""
-        )
+    const busca = (
+        document.getElementById("product-search")?.value || ""
+    )
         .toLowerCase()
         .trim();
 
-
     const categoria =
-        document.getElementById(
-            "category-filter"
-        )?.value || "";
-
+        document.getElementById("category-filter")?.value || "";
 
     const ordenacao =
-        document.getElementById(
-            "sort-products"
-        )?.value || "nome";
+        document.getElementById("sort-products")?.value || "nome";
 
-
-    let lista =
-        Object.entries(
-            produtos
-        );
-
+    let lista = Object.entries(produtos);
 
     if (busca) {
-
-        lista =
-            lista.filter(
-                ([, produto]) => {
-
-                    const nome =
-                        String(
-                            produto.nome || ""
-                        )
-                        .toLowerCase();
-
-
-                    return nome.includes(
-                        busca
-                    );
-
-                }
-            );
-
+        lista = lista.filter(([, produto]) => {
+            const nome = String(produto.nome || "").toLowerCase();
+            return nome.includes(busca);
+        });
     }
-
 
     if (categoria) {
-
-        lista =
-            lista.filter(
-                ([, produto]) =>
-                    produto.categoriaId ===
-                    categoria
-            );
-
+        lista = lista.filter(
+            ([, produto]) => produto.categoriaId === categoria
+        );
     }
 
+    lista.sort(([, a], [, b]) => {
 
-    lista.sort(
-        ([, a], [, b]) => {
+        switch (ordenacao) {
 
-            switch (ordenacao) {
+            case "preco-desc":
+                return numero(b.precoVenda) - numero(a.precoVenda);
 
-                case "preco-desc":
+            case "preco-asc":
+                return numero(a.precoVenda) - numero(b.precoVenda);
 
-                    return (
-                        numero(
-                            b.precoVenda
-                        ) -
-                        numero(
-                            a.precoVenda
-                        )
-                    );
+            case "lucro-desc":
+                return numero(b.lucro) - numero(a.lucro);
 
-
-                case "preco-asc":
-
-                    return (
-                        numero(
-                            a.precoVenda
-                        ) -
-                        numero(
-                            b.precoVenda
-                        )
-                    );
-
-
-                case "lucro-desc":
-
-                    return (
-                        numero(
-                            b.lucro
-                        ) -
-                        numero(
-                            a.lucro
-                        )
-                    );
-
-
-                default:
-
-                    return String(
-                        a.nome || ""
-                    )
-                    .localeCompare(
-                        String(
-                            b.nome || ""
-                        ),
-                        "pt-BR"
-                    );
-
-            }
+            default:
+                return String(a.nome || "").localeCompare(
+                    String(b.nome || ""),
+                    "pt-BR"
+                );
 
         }
-    );
+    });
 
-
-    const objetoFiltrado =
-        Object.fromEntries(
-            lista
-        );
-
+    const objetoFiltrado = Object.fromEntries(lista);
 
     renderizarProdutos(
         objetoFiltrado,
@@ -439,75 +341,54 @@ function atualizarListaProdutos() {
 
 function atualizarDashboard() {
 
-    const lista =
-        Object.values(
-            produtos
-        );
+    const lista = Object.values(produtos);
 
+    const quantidadeProdutos = lista.length;
 
-    const quantidadeProdutos =
-        lista.length;
+    const produzido = lista.reduce(
+        (total, produto) =>
+            total + numero(produto.produzido),
+        0
+    );
 
+    const estoque = Object.entries(produtos).reduce(
+        (total, [id, produto]) => {
 
-    const produzido =
-        lista.reduce(
-            (
-                total,
-                produto
-            ) =>
-                total +
-                numero(
-                    produto.produzido
-                ),
-            0
-        );
+            const inventario = estoquePorProduto[id];
 
+            if (!inventario) {
+                return total + numero(produto.estoque);
+            }
 
-    const estoque =
-        lista.reduce(
-            (
-                total,
-                produto
-            ) =>
-                total +
-                numero(
-                    produto.estoque
-                ),
-            0
-        );
+            const quantidade = Object.values(inventario).reduce(
+                (subtotal, porLocal) =>
+                    subtotal + Object.values(porLocal || {}).reduce(
+                        (soma, valor) => soma + numero(valor),
+                        0
+                    ),
+                0
+            );
 
+            return total + quantidade;
+        },
+        0
+    );
 
-    document.getElementById(
-        "stat-produtos"
-    ).textContent =
+    document.getElementById("stat-produtos").textContent =
         quantidadeProdutos;
 
-
-    document.getElementById(
-        "stat-produzido"
-    ).textContent =
+    document.getElementById("stat-produzido").textContent =
         produzido;
 
-
-    document.getElementById(
-        "stat-estoque"
-    ).textContent =
+    document.getElementById("stat-estoque").textContent =
         estoque;
 
-
-    document.getElementById(
-        "stat-categorias"
-    ).textContent =
-        Object.keys(
-            categorias
-        ).length;
-
+    document.getElementById("stat-categorias").textContent =
+        Object.keys(categorias).length;
 
     renderizarRecentes(
         produtos,
-        document.getElementById(
-            "recent-products"
-        )
+        document.getElementById("recent-products")
     );
 
 }
@@ -525,27 +406,19 @@ function configurarFiltros() {
         "product-search",
         "category-filter",
         "sort-products"
-    ]
-    .forEach(
-        (id) => {
+    ].forEach((id) => {
 
-            document.getElementById(
-                id
-            )?.addEventListener(
-                "input",
-                atualizarListaProdutos
-            );
+        document.getElementById(id)?.addEventListener(
+            "input",
+            atualizarListaProdutos
+        );
 
+        document.getElementById(id)?.addEventListener(
+            "change",
+            atualizarListaProdutos
+        );
 
-            document.getElementById(
-                id
-            )?.addEventListener(
-                "change",
-                atualizarListaProdutos
-            );
-
-        }
-    );
+    });
 
 }
 
@@ -558,51 +431,35 @@ function configurarFiltros() {
 
 function configurarFormularioProduto() {
 
-    document.getElementById(
-        "product-form"
-    )?.addEventListener(
+    document.getElementById("product-form")?.addEventListener(
         "submit",
         salvarFormularioProduto
     );
-
 
     [
         "product-category",
         "print-hours",
         "produced-quantity",
         "stock-quantity"
-    ]
-    .forEach(
-        (id) => {
+    ].forEach((id) => {
 
-            document.getElementById(
-                id
-            )?.addEventListener(
-                "input",
-                atualizarCalculo
-            );
+        document.getElementById(id)?.addEventListener(
+            "input",
+            atualizarCalculo
+        );
 
-            document.getElementById(
-                id
-            )?.addEventListener(
-                "change",
-                atualizarCalculo
-            );
+        document.getElementById(id)?.addEventListener(
+            "change",
+            atualizarCalculo
+        );
 
-        }
-    );
+    });
 
-
-    document.getElementById(
-        "add-filament"
-    )?.addEventListener(
+    document.getElementById("add-filament")?.addEventListener(
         "click",
         () => {
-
             adicionarLinhaFilamento();
-
             atualizarCalculo();
-
         }
     );
 
@@ -615,32 +472,18 @@ function configurarFormularioProduto() {
  * ============================================================
  */
 
-function adicionarLinhaFilamento(
-    dados = null
-) {
+function adicionarLinhaFilamento(dados = null) {
 
     const container =
-        document.getElementById(
-            "filaments-container"
-        );
-
+        document.getElementById("filaments-container");
 
     if (!container) {
-
         return;
-
     }
 
+    const row = document.createElement("div");
 
-    const row =
-        document.createElement(
-            "div"
-        );
-
-
-    row.className =
-        "filament-row";
-
+    row.className = "filament-row";
 
     row.innerHTML = `
 
@@ -658,11 +501,8 @@ function adicionarLinhaFilamento(
                     Selecione
                 </option>
 
-                ${Object.entries(
-                    filamentos
-                )
-                .map(
-                    ([id, filament]) => `
+                ${Object.entries(filamentos)
+                    .map(([id, filament]) => `
 
                         <option
                             value="${id}"
@@ -672,15 +512,12 @@ function adicionarLinhaFilamento(
                                     : ""
                             }>
 
-                            ${escaparHTML(
-                                filament.nome
-                            )}
+                            ${escaparHTML(filament.nome)}
 
                         </option>
 
-                    `
-                )
-                .join("")}
+                    `)
+                    .join("")}
 
             </select>
 
@@ -698,9 +535,7 @@ function adicionarLinhaFilamento(
                 class="product-filament-grams"
                 min="0"
                 step="0.01"
-                value="${
-                    dados?.gramas ?? 0
-                }"
+                value="${dados?.gramas ?? 0}"
                 required
             >
 
@@ -718,43 +553,22 @@ function adicionarLinhaFilamento(
 
     `;
 
+    container.appendChild(row);
 
-    container.appendChild(
-        row
-    );
-
-
-    row.querySelector(
-        ".remove-filament"
-    ).addEventListener(
+    row.querySelector(".remove-filament").addEventListener(
         "click",
         () => {
-
             row.remove();
-
             atualizarCalculo();
-
         }
     );
 
+    row.querySelectorAll("select,input").forEach((elemento) => {
 
-    row.querySelectorAll(
-        "select,input"
-    ).forEach(
-        (elemento) => {
+        elemento.addEventListener("input", atualizarCalculo);
+        elemento.addEventListener("change", atualizarCalculo);
 
-            elemento.addEventListener(
-                "input",
-                atualizarCalculo
-            );
-
-            elemento.addEventListener(
-                "change",
-                atualizarCalculo
-            );
-
-        }
-    );
+    });
 
 }
 
@@ -768,53 +582,29 @@ function adicionarLinhaFilamento(
 function obterFilamentosFormulario() {
 
     const linhas =
-        document.querySelectorAll(
-            ".filament-row"
-        );
+        document.querySelectorAll(".filament-row");
 
-
-    return Array.from(
-        linhas
-    )
-    .map(
-        (linha) => {
+    return Array.from(linhas)
+        .map((linha) => {
 
             const id =
-                linha.querySelector(
-                    ".product-filament"
-                )?.value;
+                linha.querySelector(".product-filament")?.value;
 
-
-            const gramas =
-                numero(
-                    linha.querySelector(
-                        ".product-filament-grams"
-                    )?.value
-                );
-
+            const gramas = numero(
+                linha.querySelector(".product-filament-grams")?.value
+            );
 
             if (!id) {
-
                 return null;
-
             }
 
-
             return {
-
-                filamentoId:
-                    id,
-
-                gramas:
-                    gramas
-
+                filamentoId: id,
+                gramas: gramas
             };
 
-        }
-    )
-    .filter(
-        Boolean
-    );
+        })
+        .filter(Boolean);
 
 }
 
@@ -829,34 +619,21 @@ function atualizarCalculo() {
 
     const dados = {
 
-        horasImpressao:
-            numero(
-                document.getElementById(
-                    "print-hours"
-                )?.value
-            ),
+        horasImpressao: numero(
+            document.getElementById("print-hours")?.value
+        ),
 
-        filamentos:
-            obterFilamentosFormulario(),
+        filamentos: obterFilamentosFormulario(),
 
-        configuracoes:
-            configuracoes,
+        configuracoes: configuracoes,
 
-        filamentosCadastrados:
-            filamentos
+        filamentosCadastrados: filamentos
 
     };
 
+    const calculo = calcularProduto(dados);
 
-    const calculo =
-        calcularProduto(
-            dados
-        );
-
-
-    atualizarVisualPrecificacao(
-        calculo
-    );
+    atualizarVisualPrecificacao(calculo);
 
 }
 
@@ -867,93 +644,58 @@ function atualizarCalculo() {
  * ============================================================
  */
 
-async function salvarFormularioProduto(
-    event
-) {
+async function salvarFormularioProduto(event) {
 
     event.preventDefault();
 
-
     const categoriaId =
-        document.getElementById(
-            "product-category"
-        ).value;
+        document.getElementById("product-category").value;
 
-    const cores = [...new Set(
-        document.getElementById("product-colors")
-            .value
-            .split(",")
-            .map(cor => cor.trim())
-            .filter(Boolean)
-        )
-    ];
-    
-    const categoria =
-        categorias[
-            categoriaId
-        ];
+    const campoCores =
+        document.getElementById("product-colors");
 
+    const cores = campoCores
+        ? [...new Set(
+            campoCores.value
+                .split(",")
+                .map(cor => cor.trim())
+                .filter(Boolean)
+        )]
+        : [];
+
+    const categoria = categorias[categoriaId];
 
     if (!categoria) {
-
-        mostrarToast(
-            "Selecione uma categoria."
-        );
-
+        mostrarToast("Selecione uma categoria.");
         return;
-
     }
-
 
     const nome =
-        document.getElementById(
-            "product-name"
-        ).value.trim();
-
+        document.getElementById("product-name").value.trim();
 
     if (!nome) {
-
-        mostrarToast(
-            "Informe o nome do produto."
-        );
-
+        mostrarToast("Informe o nome do produto.");
         return;
-
     }
-
 
     const dadosCalculo = {
 
-        horasImpressao:
-            numero(
-                document.getElementById(
-                    "print-hours"
-                ).value
-            ),
+        horasImpressao: numero(
+            document.getElementById("print-hours").value
+        ),
 
-        filamentos:
-            obterFilamentosFormulario(),
+        filamentos: obterFilamentosFormulario(),
 
-        configuracoes:
-            configuracoes,
+        configuracoes: configuracoes,
 
-        filamentosCadastrados:
-            filamentos
+        filamentosCadastrados: filamentos
 
     };
 
-
-    const calculo =
-        calcularProduto(
-            dadosCalculo
-        );
-
+    const calculo = calcularProduto(dadosCalculo);
 
     let referencia =
-        document.getElementById(
-            "product-reference"
-        ).value;
-
+        document.getElementById("product-reference").value;
 
     /*
      * Gera referência somente
@@ -962,110 +704,70 @@ async function salvarFormularioProduto(
 
     if (!produtoEditandoId) {
 
-        referencia =
-            gerarReferencia(
-                categoria.nome,
-                Object.values(
-                    produtos
-                )
-            );
+        referencia = gerarReferencia(
+            categoria.nome,
+            Object.values(produtos)
+        );
 
     }
 
-
     const produto = {
 
-        referencia:
+        ...(produtoEditandoId && produtos[produtoEditandoId]
+            ? produtos[produtoEditandoId]
+            : {}),
 
-            referencia,
+        referencia: referencia,
 
-        nome:
+        nome: nome,
 
-            nome,
+        categoriaId: categoriaId,
 
-        categoriaId:
+        categoriaNome: categoria.nome,
 
-            categoriaId,
-
-        categoriaNome:
-
-            categoria.nome,
-
-        descricao:
-
-            document.getElementById(
-                "product-description"
-            ).value.trim(),
+        descricao: document.getElementById(
+            "product-description"
+        ).value.trim(),
 
         fotoUrl:
-
             window.novaImagemBase64 ||
-            document.getElementById(
-                "image-preview"
-            ).dataset.imageUrl ||
+            document.getElementById("image-preview").dataset.imageUrl ||
             "",
 
-        horasImpressao:
+        horasImpressao: dadosCalculo.horasImpressao,
 
-            dadosCalculo.horasImpressao,
+        filamentos: dadosCalculo.filamentos,
 
-        filamentos:
+        cores: cores,
 
-            dadosCalculo.filamentos,
+        produzido: numero(
+            document.getElementById("produced-quantity").value
+        ),
 
-        produzido:
+        estoque: numero(
+            document.getElementById("stock-quantity").value
+        ),
 
-            numero(
-                document.getElementById(
-                    "produced-quantity"
-                ).value
-            ),
+        custoMaquina: calculo.maquina,
 
-        estoque:
+        custoMaoDeObra: calculo.maoDeObra,
 
-            numero(
-                document.getElementById(
-                    "stock-quantity"
-                ).value
-            ),
+        custoFilamentos: calculo.filamentos,
 
-        custoMaquina:
+        custoEmbalagem: calculo.embalagem,
 
-            calculo.maquina,
+        custoProducao: calculo.custoProducao,
 
-        custoMaoDeObra:
+        precoVenda: calculo.precoVenda,
 
-            calculo.maoDeObra,
-
-        custoFilamentos:
-
-            calculo.filamentos,
-
-        custoEmbalagem:
-
-            calculo.embalagem,
-
-        custoProducao:
-
-            calculo.custoProducao,
-
-        precoVenda:
-
-            calculo.precoVenda,
-
-        lucro:
-
-            calculo.lucro
+        lucro: calculo.lucro
 
     };
 
-
-    const sucesso =
-        await salvarProduto(
-            produto,
-            produtoEditandoId
-        );
-
+    const sucesso = await salvarProduto(
+        produto,
+        produtoEditandoId
+    );
 
     if (sucesso) {
 
@@ -1084,100 +786,65 @@ async function salvarFormularioProduto(
  * ============================================================
  */
 
-function abrirEdicaoProduto(
-    id
-) {
+function abrirEdicaoProduto(id) {
 
-    const produto =
-        produtos[id];
-
+    const produto = produtos[id];
 
     if (!produto) {
-
         return;
-
     }
 
+    produtoEditandoId = id;
 
-    produtoEditandoId =
-        id;
-
-
-    document.getElementById(
-        "form-title"
-    ).textContent =
+    document.getElementById("form-title").textContent =
         "Editar produto";
 
-
-    document.getElementById(
-        "product-id"
-    ).value =
+    document.getElementById("product-id").value =
         id;
 
-
-    document.getElementById(
-        "product-reference"
-    ).value =
+    document.getElementById("product-reference").value =
         produto.referencia || "";
 
-
-    document.getElementById(
-        "product-name"
-    ).value =
+    document.getElementById("product-name").value =
         produto.nome || "";
 
-
-    document.getElementById(
-        "product-category"
-    ).value =
+    document.getElementById("product-category").value =
         produto.categoriaId || "";
 
-
-    document.getElementById(
-        "product-description"
-    ).value =
+    document.getElementById("product-description").value =
         produto.descricao || "";
 
+    const campoCores =
+        document.getElementById("product-colors");
 
-    document.getElementById(
-        "print-hours"
-    ).value =
+    if (campoCores) {
+        campoCores.value = Array.isArray(produto.cores)
+            ? produto.cores.join(", ")
+            : "";
+    }
+
+    document.getElementById("print-hours").value =
         produto.horasImpressao || 0;
 
-
-    document.getElementById(
-        "produced-quantity"
-    ).value =
+    document.getElementById("produced-quantity").value =
         produto.produzido || 0;
 
-
-    document.getElementById(
-        "stock-quantity"
-    ).value =
+    document.getElementById("stock-quantity").value =
         produto.estoque || 0;
 
-
     const preview =
-        document.getElementById(
-            "image-preview"
-        );
-
+        document.getElementById("image-preview");
 
     preview.dataset.imageUrl =
         produto.fotoUrl || "";
 
-
     if (produto.fotoUrl) {
 
         preview.innerHTML = `
-
             <img
-                src="${escaparHTML(
-                    produto.fotoUrl
-                )}"
+                src="${escaparHTML(produto.fotoUrl)}"
                 alt=""
             >
-
         `;
 
     } else {
@@ -1187,33 +854,19 @@ function abrirEdicaoProduto(
 
     }
 
-
     const container =
-        document.getElementById(
-            "filaments-container"
-        );
+        document.getElementById("filaments-container");
 
-
-    container.innerHTML =
-        "";
-
+    container.innerHTML = "";
 
     if (
-        Array.isArray(
-            produto.filamentos
-        ) &&
+        Array.isArray(produto.filamentos) &&
         produto.filamentos.length
     ) {
 
-        produto.filamentos.forEach(
-            (item) => {
-
-                adicionarLinhaFilamento(
-                    item
-                );
-
-            }
-        );
+        produto.filamentos.forEach((item) => {
+            adicionarLinhaFilamento(item);
+        });
 
     } else {
 
@@ -1221,13 +874,9 @@ function abrirEdicaoProduto(
 
     }
 
-
     atualizarCalculo();
 
-
-    abrirAba(
-        "cadastro"
-    );
+    abrirAba("cadastro");
 
 }
 
@@ -1240,75 +889,50 @@ function abrirEdicaoProduto(
 
 function limparFormularioProduto() {
 
-    produtoEditandoId =
-        null;
-
+    produtoEditandoId = null;
 
     const form =
-        document.getElementById(
-            "product-form"
-        );
-
+        document.getElementById("product-form");
 
     form?.reset();
 
-
-    document.getElementById(
-        "form-title"
-    ).textContent =
+    document.getElementById("form-title").textContent =
         "Novo produto";
 
-
-    document.getElementById(
-        "product-id"
-    ).value =
+    document.getElementById("product-id").value =
         "";
 
-
-    document.getElementById(
-        "product-reference"
-    ).value =
+    document.getElementById("product-reference").value =
         "";
 
+    const campoCores =
+        document.getElementById("product-colors");
 
-    document.getElementById(
-        "produced-quantity"
-    ).value =
+    if (campoCores) {
+        campoCores.value = "";
+    }
+
+    document.getElementById("produced-quantity").value =
         "0";
 
-
-    document.getElementById(
-        "stock-quantity"
-    ).value =
+    document.getElementById("stock-quantity").value =
         "0";
-
 
     const preview =
-        document.getElementById(
-            "image-preview"
-        );
-
+        document.getElementById("image-preview");
 
     preview.innerHTML =
         "<span>Sem imagem</span>";
 
-
     preview.dataset.imageUrl =
         "";
 
+    window.novaImagemBase64 = "";
 
-    window.novaImagemBase64 =
+    document.getElementById("filaments-container").innerHTML =
         "";
-
-
-    document.getElementById(
-        "filaments-container"
-    ).innerHTML =
-        "";
-
 
     adicionarLinhaFilamento();
-
 
     atualizarCalculo();
 
@@ -1330,65 +954,39 @@ function limparFormularioProduto() {
 function configurarUploadImagem() {
 
     const input =
-        document.getElementById(
-            "product-image"
-        );
-
+        document.getElementById("product-image");
 
     const preview =
-        document.getElementById(
-            "image-preview"
-        );
+        document.getElementById("image-preview");
 
+    input?.addEventListener("change", () => {
 
-    input?.addEventListener(
-        "change",
-        () => {
+        const arquivo = input.files?.[0];
 
-            const arquivo =
-                input.files?.[0];
-
-
-            if (!arquivo) {
-
-                return;
-
-            }
-
-
-            const reader =
-                new FileReader();
-
-
-            reader.onload =
-                () => {
-
-                    const resultado =
-                        reader.result;
-
-
-                    window.novaImagemBase64 =
-                        resultado;
-
-
-                    preview.innerHTML = `
-
-                        <img
-                            src="${resultado}"
-                            alt="Prévia"
-                        >
-
-                    `;
-
-                };
-
-
-            reader.readAsDataURL(
-                arquivo
-            );
-
+        if (!arquivo) {
+            return;
         }
-    );
+
+        const reader = new FileReader();
+
+        reader.onload = () => {
+
+            const resultado = reader.result;
+
+            window.novaImagemBase64 = resultado;
+
+            preview.innerHTML = `
+                <img
+                    src="${resultado}"
+                    alt="Prévia"
+                >
+            `;
+
+        };
+
+        reader.readAsDataURL(arquivo);
+
+    });
 
 }
 
@@ -1401,9 +999,7 @@ function configurarUploadImagem() {
 
 function configurarCategorias() {
 
-    document.getElementById(
-        "category-form"
-    )?.addEventListener(
+    document.getElementById("category-form")?.addEventListener(
         "submit",
         salvarCategoria
     );
@@ -1411,97 +1007,58 @@ function configurarCategorias() {
 }
 
 
-async function salvarCategoria(
-    event
-) {
+async function salvarCategoria(event) {
 
     event.preventDefault();
 
-
     const id =
-        document.getElementById(
-            "category-id"
-        ).value;
-
+        document.getElementById("category-id").value;
 
     const nome =
-        document.getElementById(
-            "category-name"
-        ).value.trim();
-
+        document.getElementById("category-name").value.trim();
 
     if (!nome) {
-
         return;
-
     }
-
 
     try {
 
         if (id) {
 
             await update(
-                ref(
-                    database,
-                    `categorias/${id}`
-                ),
+                ref(database, `categorias/${id}`),
                 {
-                    nome:
-                        nome
+                    nome: nome
                 }
             );
 
         } else {
 
-            const nova =
-                push(
-                    ref(
-                        database,
-                        "categorias"
-                    )
-                );
-
-
-            await set(
-                nova,
-                {
-                    nome:
-                        nome,
-
-                    criadoEm:
-                        agora()
-                }
+            const nova = push(
+                ref(database, "categorias")
             );
+
+            await set(nova, {
+                nome: nome,
+                criadoEm: agora()
+            });
 
         }
 
+        document.getElementById("category-form").reset();
 
-        document.getElementById(
-            "category-form"
-        ).reset();
-
-
-        document.getElementById(
-            "category-id"
-        ).value =
+        document.getElementById("category-id").value =
             "";
-
 
         await recarregarCategorias();
 
-
-        mostrarToast(
-            "Categoria salva."
-        );
+        mostrarToast("Categoria salva.");
 
     } catch (error) {
 
         console.error(error);
 
-        mostrarToast(
-            "Erro ao salvar categoria."
-        );
+        mostrarToast("Erro ao salvar categoria.");
 
     }
 
@@ -1510,18 +1067,11 @@ async function salvarCategoria(
 
 async function recarregarCategorias() {
 
-    const snapshot =
-        await get(
-            ref(
-                database,
-                "categorias"
-            )
-        );
+    const snapshot = await get(
+        ref(database, "categorias")
+    );
 
-
-    categorias =
-        snapshot.val() || {};
-
+    categorias = snapshot.val() || {};
 
     atualizarCategorias();
 
@@ -1533,86 +1083,54 @@ async function recarregarCategorias() {
 function atualizarCategorias() {
 
     const selectProduto =
-        document.getElementById(
-            "product-category"
-        );
-
+        document.getElementById("product-category");
 
     const selectFiltro =
-        document.getElementById(
-            "category-filter"
-        );
-
+        document.getElementById("category-filter");
 
     if (selectProduto) {
 
-        selectProduto.innerHTML = `
+        const categoriaAtual = selectProduto.value;
 
+        selectProduto.innerHTML = `
             <option value="">
                 Selecione uma categoria
             </option>
 
-            ${Object.entries(
-                categorias
-            )
-            .map(
-                ([id, categoria]) => `
-
+            ${Object.entries(categorias)
+                .map(([id, categoria]) => `
                     <option value="${id}">
-
-                        ${escaparHTML(
-                            categoria.nome
-                        )}
-
+                        ${escaparHTML(categoria.nome)}
                     </option>
-
-                `
-            )
-            .join("")}
-
+                `)
+                .join("")}
         `;
+
+        selectProduto.value = categoriaAtual;
 
     }
 
-
     if (selectFiltro) {
 
-        const valorAtual =
-            selectFiltro.value;
-
+        const valorAtual = selectFiltro.value;
 
         selectFiltro.innerHTML = `
-
             <option value="">
                 Todas as categorias
             </option>
 
-            ${Object.entries(
-                categorias
-            )
-            .map(
-                ([id, categoria]) => `
-
+            ${Object.entries(categorias)
+                .map(([id, categoria]) => `
                     <option value="${id}">
-
-                        ${escaparHTML(
-                            categoria.nome
-                        )}
-
+                        ${escaparHTML(categoria.nome)}
                     </option>
-
-                `
-            )
-            .join("")}
-
+                `)
+                .join("")}
         `;
 
-
-        selectFiltro.value =
-            valorAtual;
+        selectFiltro.value = valorAtual;
 
     }
-
 
     renderizarListaCategorias();
 
@@ -1622,23 +1140,13 @@ function atualizarCategorias() {
 function renderizarListaCategorias() {
 
     const container =
-        document.getElementById(
-            "categories-list"
-        );
-
+        document.getElementById("categories-list");
 
     if (!container) {
-
         return;
-
     }
 
-
-    const lista =
-        Object.entries(
-            categorias
-        );
-
+    const lista = Object.entries(categorias);
 
     if (!lista.length) {
 
@@ -1649,124 +1157,79 @@ function renderizarListaCategorias() {
         `;
 
         return;
-
     }
 
+    container.innerHTML = lista.map(([id, categoria]) => `
 
-    container.innerHTML =
-        lista.map(
-            ([id, categoria]) => `
+        <div class="settings-item">
 
-                <div class="settings-item">
+            <div class="settings-item-info">
 
-                    <div
-                        class="settings-item-info">
+                <strong>
+                    ${escaparHTML(categoria.nome)}
+                </strong>
 
-                        <strong>
-                            ${escaparHTML(
-                                categoria.nome
-                            )}
-                        </strong>
+                <small>
+                    Prefixo:
+                    ${escaparHTML(
+                        categoria.nome.substring(0, 2).toUpperCase()
+                    )}
+                </small>
 
-                        <small>
-                            Prefixo:
-                            ${escaparHTML(
-                                categoria.nome
-                                    .substring(0, 2)
-                                    .toUpperCase()
-                            )}
-                        </small>
+            </div>
 
-                    </div>
+            <div class="settings-item-actions">
 
+                <button
+                    class="icon-button danger"
+                    data-delete-category="${id}">
 
-                    <div
-                        class="settings-item-actions">
+                    ×
 
-                        <button
-                            class="icon-button danger"
-                            data-delete-category="${id}">
+                </button>
 
-                            ×
+            </div>
 
-                        </button>
+        </div>
 
-                    </div>
+    `).join("");
 
-                </div>
+    container.querySelectorAll("[data-delete-category]").forEach(
+        (button) => {
 
-            `
-        )
-        .join("");
+            button.addEventListener("click", () => {
+                excluirCategoria(button.dataset.deleteCategory);
+            });
 
-
-    container
-        .querySelectorAll(
-            "[data-delete-category]"
-        )
-        .forEach(
-            (button) => {
-
-                button.addEventListener(
-                    "click",
-                    () => {
-
-                        excluirCategoria(
-                            button.dataset
-                                .deleteCategory
-                        );
-
-                    }
-                );
-
-            }
-        );
+        }
+    );
 
 }
 
 
-async function excluirCategoria(
-    id
-) {
+async function excluirCategoria(id) {
 
-    const categoria =
-        categorias[id];
-
+    const categoria = categorias[id];
 
     if (!categoria) {
-
         return;
-
     }
 
-
-    const confirmar =
-        confirm(
-            `Excluir a categoria "${categoria.nome}"?`
-        );
-
-
-    if (!confirmar) {
-
-        return;
-
-    }
-
-
-    await remove(
-        ref(
-            database,
-            `categorias/${id}`
-        )
+    const confirmar = confirm(
+        `Excluir a categoria "${categoria.nome}"?`
     );
 
+    if (!confirmar) {
+        return;
+    }
+
+    await remove(
+        ref(database, `categorias/${id}`)
+    );
 
     await recarregarCategorias();
 
-
-    mostrarToast(
-        "Categoria excluída."
-    );
+    mostrarToast("Categoria excluída.");
 
 }
 
@@ -1779,9 +1242,7 @@ async function excluirCategoria(
 
 function configurarFilamentos() {
 
-    document.getElementById(
-        "filament-form"
-    )?.addEventListener(
+    document.getElementById("filament-form")?.addEventListener(
         "submit",
         salvarFilamento
     );
@@ -1789,49 +1250,30 @@ function configurarFilamentos() {
 }
 
 
-async function salvarFilamento(
-    event
-) {
+async function salvarFilamento(event) {
 
     event.preventDefault();
 
-
     const id =
-        document.getElementById(
-            "filament-id"
-        ).value;
-
+        document.getElementById("filament-id").value;
 
     const nome =
-        document.getElementById(
-            "filament-name"
-        ).value.trim();
+        document.getElementById("filament-name").value.trim();
 
-
-    const valorPorGrama =
-        numero(
-            document.getElementById(
-                "filament-price"
-            ).value
-        );
-
+    const valorPorGrama = numero(
+        document.getElementById("filament-price").value
+    );
 
     if (!nome) {
-
         return;
-
     }
-
 
     try {
 
         if (id) {
 
             await update(
-                ref(
-                    database,
-                    `filamentos/${id}`
-                ),
+                ref(database, `filamentos/${id}`),
                 {
                     nome,
                     valorPorGrama
@@ -1840,57 +1282,32 @@ async function salvarFilamento(
 
         } else {
 
-            const nova =
-                push(
-                    ref(
-                        database,
-                        "filamentos"
-                    )
-                );
-
-
-            await set(
-                nova,
-                {
-
-                    nome,
-
-                    valorPorGrama,
-
-                    criadoEm:
-                        agora()
-
-                }
+            const nova = push(
+                ref(database, "filamentos")
             );
+
+            await set(nova, {
+                nome,
+                valorPorGrama,
+                criadoEm: agora()
+            });
 
         }
 
+        document.getElementById("filament-form").reset();
 
-        document.getElementById(
-            "filament-form"
-        ).reset();
-
-
-        document.getElementById(
-            "filament-id"
-        ).value =
+        document.getElementById("filament-id").value =
             "";
-
 
         await recarregarFilamentos();
 
-
-        mostrarToast(
-            "Filamento salvo."
-        );
+        mostrarToast("Filamento salvo.");
 
     } catch (error) {
 
         console.error(error);
 
-        mostrarToast(
-            "Erro ao salvar filamento."
-        );
+        mostrarToast("Erro ao salvar filamento.");
 
     }
 
@@ -1899,38 +1316,21 @@ async function salvarFilamento(
 
 async function recarregarFilamentos() {
 
-    const snapshot =
-        await get(
-            ref(
-                database,
-                "filamentos"
-            )
-        );
+    const snapshot = await get(
+        ref(database, "filamentos")
+    );
 
-
-    filamentos =
-        snapshot.val() || {};
-
+    filamentos = snapshot.val() || {};
 
     atualizarFilamentos();
 
-
     const container =
-        document.getElementById(
-            "filaments-container"
-        );
-
+        document.getElementById("filaments-container");
 
     if (container) {
-
-        container.innerHTML =
-            "";
-
-
+        container.innerHTML = "";
         adicionarLinhaFilamento();
-
     }
-
 
     atualizarCalculo();
 
@@ -1938,32 +1338,20 @@ async function recarregarFilamentos() {
 
 
 function atualizarFilamentos() {
-
     renderizarListaFilamentos();
-
 }
 
 
 function renderizarListaFilamentos() {
 
     const container =
-        document.getElementById(
-            "filaments-list"
-        );
-
+        document.getElementById("filaments-list");
 
     if (!container) {
-
         return;
-
     }
 
-
-    const lista =
-        Object.entries(
-            filamentos
-        );
-
+    const lista = Object.entries(filamentos);
 
     if (!lista.length) {
 
@@ -1974,122 +1362,77 @@ function renderizarListaFilamentos() {
         `;
 
         return;
-
     }
 
+    container.innerHTML = lista.map(([id, filament]) => `
 
-    container.innerHTML =
-        lista.map(
-            ([id, filament]) => `
+        <div class="settings-item">
 
-                <div class="settings-item">
+            <div class="settings-item-info">
 
-                    <div
-                        class="settings-item-info">
+                <strong>
+                    ${escaparHTML(filament.nome)}
+                </strong>
 
-                        <strong>
-                            ${escaparHTML(
-                                filament.nome
-                            )}
-                        </strong>
+                <small>
+                    ${formatarMoeda(filament.valorPorGrama)}
+                    por grama
+                </small>
 
-                        <small>
-                            ${formatarMoeda(
-                                filament.valorPorGrama
-                            )}
-                                por grama
-                        </small>
+            </div>
 
-                    </div>
+            <div class="settings-item-actions">
 
+                <button
+                    class="icon-button danger"
+                    data-delete-filament="${id}">
 
-                    <div
-                        class="settings-item-actions">
+                    ×
 
-                        <button
-                            class="icon-button danger"
-                            data-delete-filament="${id}">
+                </button>
 
-                            ×
+            </div>
 
-                        </button>
+        </div>
 
-                    </div>
+    `).join("");
 
-                </div>
+    container.querySelectorAll("[data-delete-filament]").forEach(
+        (button) => {
 
-            `
-        )
-        .join("");
+            button.addEventListener("click", () => {
+                excluirFilamento(button.dataset.deleteFilament);
+            });
 
-
-    container
-        .querySelectorAll(
-            "[data-delete-filament]"
-        )
-        .forEach(
-            (button) => {
-
-                button.addEventListener(
-                    "click",
-                    () => {
-
-                        excluirFilamento(
-                            button.dataset
-                                .deleteFilament
-                        );
-
-                    }
-                );
-
-            }
-        );
+        }
+    );
 
 }
 
 
-async function excluirFilamento(
-    id
-) {
+async function excluirFilamento(id) {
 
-    const filament =
-        filamentos[id];
-
+    const filament = filamentos[id];
 
     if (!filament) {
-
         return;
-
     }
 
-
-    const confirmar =
-        confirm(
-            `Excluir o filamento "${filament.nome}"?`
-        );
-
-
-    if (!confirmar) {
-
-        return;
-
-    }
-
-
-    await remove(
-        ref(
-            database,
-            `filamentos/${id}`
-        )
+    const confirmar = confirm(
+        `Excluir o filamento "${filament.nome}"?`
     );
 
+    if (!confirmar) {
+        return;
+    }
+
+    await remove(
+        ref(database, `filamentos/${id}`)
+    );
 
     await recarregarFilamentos();
 
-
-    mostrarToast(
-        "Filamento excluído."
-    );
+    mostrarToast("Filamento excluído.");
 
 }
 
@@ -2102,9 +1445,7 @@ async function excluirFilamento(
 
 function configurarConfiguracoes() {
 
-    document.getElementById(
-        "settings-form"
-    )?.addEventListener(
+    document.getElementById("settings-form")?.addEventListener(
         "submit",
         salvarConfiguracoes
     );
@@ -2114,146 +1455,104 @@ function configurarConfiguracoes() {
 
 function carregarConfiguracoes() {
 
-    document.getElementById(
-        "electricity-cost"
-    ).value =
-        configuracoes.energiaEletrica ??
-        0;
+    document.getElementById("electricity-cost").value =
+        configuracoes.energiaEletrica ?? 0;
 
+    document.getElementById("printer-consumption").value =
+        configuracoes.consumoImpressora ?? 0;
 
-    document.getElementById(
-        "printer-consumption"
-    ).value =
-        configuracoes.consumoImpressora ??
-        0;
+    document.getElementById("labor-hour").value =
+        configuracoes.maoDeObraHora ?? 0;
 
+    document.getElementById("packaging-cost-setting").value =
+        configuracoes.embalagemPorPeca ?? 0;
 
-    document.getElementById(
-        "labor-hour"
-    ).value =
-        configuracoes.maoDeObraHora ??
-        0;
-
-
-    document.getElementById(
-        "packaging-cost-setting"
-    ).value =
-        configuracoes.embalagemPorPeca ??
-        0;
-
-
-    document.getElementById(
-        "profit-margin"
-    ).value =
-        configuracoes.margemLucro ??
-        0;
+    document.getElementById("profit-margin").value =
+        configuracoes.margemLucro ?? 0;
 
 }
 
 
-async function salvarConfiguracoes(
-    event
-) {
+async function salvarConfiguracoes(event) {
 
     event.preventDefault();
 
-
     configuracoes = {
 
-        energiaEletrica:
+        energiaEletrica: numero(
+            document.getElementById("electricity-cost").value
+        ),
 
-            numero(
-                document.getElementById(
-                    "electricity-cost"
-                ).value
-            ),
+        consumoImpressora: numero(
+            document.getElementById("printer-consumption").value
+        ),
 
-        consumoImpressora:
+        maoDeObraHora: numero(
+            document.getElementById("labor-hour").value
+        ),
 
-            numero(
-                document.getElementById(
-                    "printer-consumption"
-                ).value
-            ),
+        embalagemPorPeca: numero(
+            document.getElementById("packaging-cost-setting").value
+        ),
 
-        maoDeObraHora:
+        margemLucro: numero(
+            document.getElementById("profit-margin").value
+        ),
 
-            numero(
-                document.getElementById(
-                    "labor-hour"
-                ).value
-            ),
-
-        embalagemPorPeca:
-
-            numero(
-                document.getElementById(
-                    "packaging-cost-setting"
-                ).value
-            ),
-
-        margemLucro:
-
-            numero(
-                document.getElementById(
-                    "profit-margin"
-                ).value
-            ),
-
-        atualizadoEm:
-            agora()
+        atualizadoEm: agora()
 
     };
-
 
     try {
 
         await set(
-            ref(
-                database,
-                "configuracoes"
-            ),
+            ref(database, "configuracoes"),
             configuracoes
         );
 
-
         atualizarCalculo();
 
-
-        mostrarToast(
-            "Configurações salvas."
-        );
+        mostrarToast("Configurações salvas.");
 
     } catch (error) {
 
         console.error(error);
 
-        mostrarToast(
-            "Erro ao salvar configurações."
-        );
-        
+        mostrarToast("Erro ao salvar configurações.");
+
     }
 
 }
 
-/* ============================================================
-   LOCAIS DE ESTOQUE
-============================================================ */
+
+/*
+ * ============================================================
+ * LOCAIS DE ESTOQUE
+ * ============================================================
+ */
 
 function configurarLocais() {
 
-    document.getElementById("location-form")
-        ?.addEventListener("submit", salvarLocal);
+    document.getElementById("location-form")?.addEventListener(
+        "submit",
+        salvarLocal
+    );
 
-    document.getElementById("cancel-location-edit")
-        ?.addEventListener("click", limparFormularioLocal);
+    document.getElementById("cancel-location-edit")?.addEventListener(
+        "click",
+        limparFormularioLocal
+    );
 
-    document.getElementById("locations-list")
-        ?.addEventListener("click", async (event) => {
+    document.getElementById("locations-list")?.addEventListener(
+        "click",
+        async (event) => {
 
-            const botao = event.target.closest("[data-location-action]");
+            const botao =
+                event.target.closest("[data-location-action]");
 
-            if (!botao) return;
+            if (!botao) {
+                return;
+            }
 
             const id = botao.dataset.id;
             const acao = botao.dataset.locationAction;
@@ -2265,7 +1564,10 @@ function configurarLocais() {
             if (acao === "excluir") {
                 await excluirLocal(id);
             }
-        });
+
+        }
+    );
+
 }
 
 
@@ -2273,10 +1575,11 @@ async function salvarLocal(event) {
 
     event.preventDefault();
 
-    const id = document.getElementById("location-id").value;
+    const id =
+        document.getElementById("location-id").value;
 
-    const nome = document.getElementById("location-name")
-        .value.trim();
+    const nome =
+        document.getElementById("location-name").value.trim();
 
     if (!nome) {
         mostrarToast("Informe o nome do local.");
@@ -2286,7 +1589,7 @@ async function salvarLocal(event) {
     const nomeDuplicado = Object.entries(locais).some(
         ([localId, local]) =>
             localId !== id &&
-            local.nome.toLowerCase() === nome.toLowerCase()
+            String(local.nome || "").toLowerCase() === nome.toLowerCase()
     );
 
     if (nomeDuplicado) {
@@ -2298,22 +1601,29 @@ async function salvarLocal(event) {
 
         if (id) {
 
-            await update(ref(database, `locais/${id}`), {
-                nome,
-                atualizadoEm: agora()
-            });
+            await update(
+                ref(database, `locais/${id}`),
+                {
+                    nome,
+                    atualizadoEm: agora()
+                }
+            );
 
         } else {
 
-            const novoLocal = push(ref(database, "locais"));
+            const novoLocal = push(
+                ref(database, "locais")
+            );
 
             await set(novoLocal, {
                 nome,
                 criadoEm: agora()
             });
+
         }
 
         limparFormularioLocal();
+
         await recarregarLocais();
 
         mostrarToast("Local salvo com sucesso.");
@@ -2321,9 +1631,11 @@ async function salvarLocal(event) {
     } catch (error) {
 
         console.error(error);
+
         mostrarToast("Erro ao salvar local.");
 
     }
+
 }
 
 
@@ -2331,19 +1643,27 @@ function editarLocal(id) {
 
     const local = locais[id];
 
-    if (!local) return;
+    if (!local) {
+        return;
+    }
 
-    document.getElementById("location-id").value = id;
-    document.getElementById("location-name").value = local.nome;
+    document.getElementById("location-id").value =
+        id;
+
+    document.getElementById("location-name").value =
+        local.nome;
 
     document.getElementById("location-name").focus();
+
 }
 
 
 function limparFormularioLocal() {
 
     document.getElementById("location-form").reset();
-    document.getElementById("location-id").value = "";
+
+    document.getElementById("location-id").value =
+        "";
 
 }
 
@@ -2352,24 +1672,31 @@ async function excluirLocal(id) {
 
     const local = locais[id];
 
-    if (!local) return;
+    if (!local) {
+        return;
+    }
 
     try {
 
-        // Não permite excluir um local que ainda tenha estoque.
-        const estoqueSnapshot = await get(ref(database, "estoque"));
+        const estoqueSnapshot = await get(
+            ref(database, "estoque")
+        );
+
         const estoque = estoqueSnapshot.val() || {};
 
         const possuiEstoque = Object.values(estoque).some(
-            produto => Object.values(produto || {}).some(
-                variacao => Number(variacao?.[id] || 0) > 0
-            )
+            produto =>
+                Object.values(produto || {}).some(
+                    variacao => numero(variacao?.[id]) > 0
+                )
         );
 
         if (possuiEstoque) {
+
             mostrarToast(
                 "Este local possui produtos. Transfira o estoque antes de excluí-lo."
             );
+
             return;
         }
 
@@ -2377,7 +1704,9 @@ async function excluirLocal(id) {
             return;
         }
 
-        await remove(ref(database, `locais/${id}`));
+        await remove(
+            ref(database, `locais/${id}`)
+        );
 
         await recarregarLocais();
 
@@ -2386,28 +1715,37 @@ async function excluirLocal(id) {
     } catch (error) {
 
         console.error(error);
+
         mostrarToast("Erro ao excluir local.");
 
     }
+
 }
 
 
 async function recarregarLocais() {
 
-    const snapshot = await get(ref(database, "locais"));
+    const snapshot = await get(
+        ref(database, "locais")
+    );
 
     locais = snapshot.val() || {};
 
     atualizarLocais();
+
+    atualizarPainelEstoque();
 
 }
 
 
 function atualizarLocais() {
 
-    const container = document.getElementById("locations-list");
+    const container =
+        document.getElementById("locations-list");
 
-    if (!container) return;
+    if (!container) {
+        return;
+    }
 
     const lista = Object.entries(locais);
 
@@ -2419,6 +1757,8 @@ function atualizarLocais() {
             </div>
         `;
 
+        atualizarPainelEstoque();
+
         return;
     }
 
@@ -2426,7 +1766,9 @@ function atualizarLocais() {
 
         <div class="settings-item">
 
-            <strong>${escaparHTML(local.nome)}</strong>
+            <strong>
+                ${escaparHTML(local.nome)}
+            </strong>
 
             <div class="settings-actions">
 
@@ -2435,7 +1777,9 @@ function atualizarLocais() {
                     class="btn btn-secondary"
                     data-location-action="editar"
                     data-id="${id}">
+
                     Editar
+
                 </button>
 
                 <button
@@ -2443,7 +1787,9 @@ function atualizarLocais() {
                     class="btn btn-danger"
                     data-location-action="excluir"
                     data-id="${id}">
+
                     Excluir
+
                 </button>
 
             </div>
@@ -2451,5 +1797,703 @@ function atualizarLocais() {
         </div>
 
     `).join("");
+
+    atualizarPainelEstoque();
+
+}
+
+
+/*
+ * ============================================================
+ * ESTOQUE POR LOCAL, VARIAÇÕES E BAIXA DE VENDAS
+ * ============================================================
+ *
+ * Estrutura no Firebase:
+ *
+ * estoque/{produtoId}/{corCodificada}/{localId} = quantidade
+ *
+ * Produtos sem variações usam a chave "__sem_cor".
+ *
+ * As movimentações ficam em:
+ * movimentacoesEstoque
+ *
+ */
+
+
+function configurarEstoque() {
+
+    const abaProdutos =
+        document.getElementById("tab-produtos");
+
+    if (!abaProdutos) {
+        return;
+    }
+
+    let painel =
+        document.getElementById("inventory-management");
+
+    if (!painel) {
+
+        painel = document.createElement("section");
+
+        painel.id = "inventory-management";
+
+        painel.className = "settings-section";
+
+        painel.innerHTML = `
+
+            <div class="section-header">
+
+                <div>
+
+                    <h2>Estoque e vendas</h2>
+
+                    <p>
+                        Adicione unidades ao estoque ou registre uma venda
+                        escolhendo produto, cor e local.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="form-grid">
+
+                <div class="form-group">
+
+                    <label for="inventory-product">
+                        Produto
+                    </label>
+
+                    <select id="inventory-product">
+
+                        <option value="">
+                            Selecione um produto
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="inventory-color">
+                        Cor / variação
+                    </label>
+
+                    <select id="inventory-color">
+
+                        <option value="__sem_cor">
+                            Sem variação
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="inventory-location">
+                        Local
+                    </label>
+
+                    <select id="inventory-location">
+
+                        <option value="">
+                            Selecione um local
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="form-group">
+
+                    <label for="inventory-quantity">
+                        Quantidade
+                    </label>
+
+                    <input
+                        id="inventory-quantity"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value="1"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <div class="form-actions">
+
+                <button
+                    type="button"
+                    class="btn btn-primary"
+                    id="inventory-add">
+
+                    Adicionar ao estoque
+
+                </button>
+
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    id="inventory-sale">
+
+                    Registrar venda / baixar estoque
+
+                </button>
+
+            </div>
+
+
+            <div
+                id="inventory-summary"
+                class="inventory-summary">
+            </div>
+
+        `;
+
+        const grade =
+            document.getElementById("products-grid");
+
+        if (grade?.parentElement) {
+
+            grade.parentElement.insertBefore(
+                painel,
+                grade
+            );
+
+        } else {
+
+            abaProdutos.appendChild(painel);
+
+        }
+
+    }
+
+    document.getElementById("inventory-product")?.addEventListener(
+        "change",
+        atualizarOpcoesCoresEstoque
+    );
+
+    document.getElementById("inventory-add")?.addEventListener(
+        "click",
+        () => movimentarEstoque("entrada")
+    );
+
+    document.getElementById("inventory-sale")?.addEventListener(
+        "click",
+        () => movimentarEstoque("venda")
+    );
+
+    atualizarPainelEstoque();
+
+}
+
+
+function chaveCorEstoque(cor) {
+
+    if (!cor) {
+        return "__sem_cor";
+    }
+
+    return encodeURIComponent(
+        String(cor).trim().toLowerCase()
+    );
+
+}
+
+
+function obterCoresProduto(produto) {
+
+    return Array.isArray(produto?.cores)
+        ? produto.cores
+            .map(cor => String(cor).trim())
+            .filter(Boolean)
+        : [];
+
+}
+
+
+function atualizarPainelEstoque() {
+
+    const selectProduto =
+        document.getElementById("inventory-product");
+
+    const selectLocal =
+        document.getElementById("inventory-location");
+
+    if (!selectProduto || !selectLocal) {
+        return;
+    }
+
+    const produtoAtual = selectProduto.value;
+    const localAtual = selectLocal.value;
+
+    selectProduto.innerHTML = `
+
+        <option value="">
+            Selecione um produto
+        </option>
+
+        ${Object.entries(produtos)
+            .map(([id, produto]) => `
+
+                <option value="${escaparHTML(id)}">
+                    ${escaparHTML(produto.nome || "Produto sem nome")}
+                </option>
+
+            `)
+            .join("")}
+
+    `;
+
+    if (produtos[produtoAtual]) {
+        selectProduto.value = produtoAtual;
+    }
+
+    selectLocal.innerHTML = `
+
+        <option value="">
+            Selecione um local
+        </option>
+
+        ${Object.entries(locais)
+            .map(([id, local]) => `
+
+                <option value="${escaparHTML(id)}">
+                    ${escaparHTML(local.nome || "Local")}
+                </option>
+
+            `)
+            .join("")}
+
+    `;
+
+    if (locais[localAtual]) {
+        selectLocal.value = localAtual;
+    }
+
+    atualizarOpcoesCoresEstoque();
+
+    renderizarResumoEstoque();
+
+}
+
+
+function atualizarOpcoesCoresEstoque() {
+
+    const selectProduto =
+        document.getElementById("inventory-product");
+
+    const selectCor =
+        document.getElementById("inventory-color");
+
+    if (!selectProduto || !selectCor) {
+        return;
+    }
+
+    const produto = produtos[selectProduto.value];
+
+    const corAtual = selectCor.value;
+
+    const cores = obterCoresProduto(produto);
+
+    if (!cores.length) {
+
+        selectCor.innerHTML = `
+            <option value="__sem_cor">
+                Sem variação
+            </option>
+        `;
+
+        selectCor.value = "__sem_cor";
+
+        renderizarResumoEstoque();
+
+        return;
+    }
+
+    selectCor.innerHTML = cores.map(cor => `
+
+        <option value="${escaparHTML(chaveCorEstoque(cor))}">
+            ${escaparHTML(cor)}
+        </option>
+
+    `).join("");
+
+    if (cores.some(cor => chaveCorEstoque(cor) === corAtual)) {
+        selectCor.value = corAtual;
+    }
+
+    renderizarResumoEstoque();
+
+}
+
+
+function quantidadeEstoque(produtoId, corKey, localId) {
+
+    return numero(
+        estoquePorProduto?.[produtoId]?.[corKey]?.[localId]
+    );
+
+}
+
+
+function totalEstoqueProduto(produtoId) {
+
+    const inventario =
+        estoquePorProduto[produtoId] || {};
+
+    return Object.values(inventario).reduce(
+        (total, porLocal) => {
+
+            return total + Object.values(porLocal || {}).reduce(
+                (soma, quantidade) =>
+                    soma + numero(quantidade),
+                0
+            );
+
+        },
+        0
+    );
+
+}
+
+
+function renderizarResumoEstoque() {
+
+    const container =
+        document.getElementById("inventory-summary");
+
+    if (!container) {
+        return;
+    }
+
+    const produtoId =
+        document.getElementById("inventory-product")?.value;
+
+    const produto = produtos[produtoId];
+
+    if (!produto) {
+
+        container.innerHTML = `
+            <p>Selecione um produto para consultar o estoque.</p>
+        `;
+
+        return;
+    }
+
+    const cores = obterCoresProduto(produto);
+
+    const inventario =
+        estoquePorProduto[produtoId] || {};
+
+    const linhas = [];
+
+    if (!cores.length) {
+
+        const porLocal =
+            inventario["__sem_cor"] || {};
+
+        Object.entries(locais).forEach(([localId, local]) => {
+
+            linhas.push({
+
+                cor: "Sem variação",
+
+                local: local.nome,
+
+                quantidade: numero(porLocal[localId])
+
+            });
+
+        });
+
+    } else {
+
+        cores.forEach(cor => {
+
+            const porLocal =
+                inventario[chaveCorEstoque(cor)] || {};
+
+            Object.entries(locais).forEach(([localId, local]) => {
+
+                linhas.push({
+
+                    cor,
+
+                    local: local.nome,
+
+                    quantidade: numero(porLocal[localId])
+
+                });
+
+            });
+
+        });
+
+    }
+
+    container.innerHTML = `
+
+        <h3>
+            Estoque de ${escaparHTML(produto.nome || "")}
+        </h3>
+
+        <p>
+            <strong>Total:</strong>
+            ${totalEstoqueProduto(produtoId)} unidade(s)
+        </p>
+
+        ${linhas.length ? `
+
+            <div class="inventory-table">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+                            <th>Cor</th>
+                            <th>Local</th>
+                            <th>Quantidade</th>
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        ${linhas.map(item => `
+
+                            <tr>
+
+                                <td>
+                                    ${escaparHTML(item.cor)}
+                                </td>
+
+                                <td>
+                                    ${escaparHTML(item.local || "")}
+                                </td>
+
+                                <td>
+                                    ${item.quantidade}
+                                </td>
+
+                            </tr>
+
+                        `).join("")}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        ` : `
+
+            <p>
+                Cadastre ao menos um local em Configurações
+                para controlar o estoque.
+            </p>
+
+        `}
+
+    `;
+
+}
+
+
+async function movimentarEstoque(tipo) {
+
+    const produtoId =
+        document.getElementById("inventory-product")?.value;
+
+    const corKey =
+        document.getElementById("inventory-color")?.value || "__sem_cor";
+
+    const localId =
+        document.getElementById("inventory-location")?.value;
+
+    const quantidade = Math.floor(
+        numero(
+            document.getElementById("inventory-quantity")?.value
+        )
+    );
+
+    if (!produtoId || !produtos[produtoId]) {
+
+        mostrarToast("Selecione um produto.");
+
+        return;
+
+    }
+
+    if (!localId || !locais[localId]) {
+
+        mostrarToast("Selecione um local de estoque.");
+
+        return;
+
+    }
+
+    if (!Number.isFinite(quantidade) || quantidade < 1) {
+
+        mostrarToast("Informe uma quantidade válida.");
+
+        return;
+
+    }
+
+    const produto = produtos[produtoId];
+
+    const cores = obterCoresProduto(produto);
+
+    const corValida = corKey === "__sem_cor"
+        ? cores.length === 0
+        : cores.some(cor => chaveCorEstoque(cor) === corKey);
+
+    if (!corValida) {
+
+        mostrarToast(
+            "A variação selecionada não pertence a este produto."
+        );
+
+        return;
+
+    }
+
+    const caminho =
+        `estoque/${produtoId}/${corKey}/${localId}`;
+
+    try {
+
+        if (tipo === "venda") {
+
+            const resultado = await runTransaction(
+                ref(database, caminho),
+                atual => {
+
+                    const disponivel = numero(atual);
+
+                    if (disponivel < quantidade) {
+                        return;
+                    }
+
+                    return disponivel - quantidade;
+
+                }
+            );
+
+            if (!resultado.committed) {
+
+                mostrarToast(
+                    "Estoque insuficiente para essa venda."
+                );
+
+                return;
+
+            }
+
+        } else {
+
+            await runTransaction(
+                ref(database, caminho),
+                atual => numero(atual) + quantidade
+            );
+
+        }
+
+        const snapshot = await get(
+            ref(database, `estoque/${produtoId}`)
+        );
+
+        const inventarioAtual =
+            snapshot.val() || {};
+
+        const total = Object.values(inventarioAtual).reduce(
+            (soma, porLocal) => {
+
+                return soma + Object.values(porLocal || {}).reduce(
+                    (subtotal, valor) =>
+                        subtotal + numero(valor),
+                    0
+                );
+
+            },
+            0
+        );
+
+        await update(
+            ref(database, `produtos/${produtoId}`),
+            {
+                estoque: total,
+                estoqueAtualizadoEm: agora()
+            }
+        );
+
+        await set(
+            push(ref(database, "movimentacoesEstoque")),
+            {
+
+                produtoId,
+
+                produtoNome: produto.nome || "",
+
+                cor: cores.length
+                    ? cores.find(
+                        item => chaveCorEstoque(item) === corKey
+                    ) || ""
+                    : "",
+
+                localId,
+
+                localNome: locais[localId].nome || "",
+
+                tipo,
+
+                quantidade,
+
+                criadoEm: agora()
+
+            }
+        );
+
+        const estoqueSnapshot = await get(
+            ref(database, "estoque")
+        );
+
+        estoquePorProduto =
+            estoqueSnapshot.val() || {};
+
+        renderizarResumoEstoque();
+
+        atualizarDashboard();
+
+        mostrarToast(
+            tipo === "venda"
+                ? "Venda registrada e estoque atualizado."
+                : "Estoque atualizado com sucesso."
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Erro ao movimentar estoque:",
+            error
+        );
+
+        mostrarToast(
+            "Não foi possível atualizar o estoque."
+        );
+
+    }
 
 }
