@@ -45,22 +45,12 @@ import {
  * ============================================================
  */
 
-let produtos =
-    {};
-
-let categorias =
-    {};
-
-let filamentos =
-    {};
-
-let configuracoes =
-    {};
-
-
-let produtoEditandoId =
-    null;
-
+let produtos = {};
+let categorias = {};
+let filamentos = {};
+let configuracoes = {};
+let produtoEditandoId = null;
+let locais = {};
 
 /*
  * ============================================================
@@ -75,6 +65,7 @@ async function iniciar() {
     configurarAcoes();
     configurarFormularioProduto();
     configurarConfiguracoes();
+    configurarLocais();
     configurarFilamentos();
     configurarCategorias();
     configurarFiltros();
@@ -89,20 +80,29 @@ async function iniciar() {
 
 async function carregarDados() {
     try {
-        const [categoriasSnapshot, filamentosSnapshot, configuracoesSnapshot] = await Promise.all([
+        const [
+            categoriasSnapshot,
+            filamentosSnapshot,
+            configuracoesSnapshot,
+            locaisSnapshot
+        ] = await Promise.all([
             get(ref(database, "categorias")),
             get(ref(database, "filamentos")),
-            get(ref(database, "configuracoes"))
+            get(ref(database, "configuracoes")),
+            get(ref(database, "locais"))
         ]);
 
         categorias = categoriasSnapshot.val() || {};
         filamentos = filamentosSnapshot.val() || {};
         configuracoes = configuracoesSnapshot.val() || {};
+        locais = locaisSnapshot.val() || {};
 
         atualizarCategorias();
         atualizarFilamentos();
+        atualizarLocais();
         carregarConfiguracoes();
         atualizarInterface();
+
     } catch (error) {
         console.error("Erro ao carregar dados:", error);
         mostrarToast("Erro ao carregar os dados.");
@@ -2223,7 +2223,225 @@ async function salvarConfiguracoes(
         mostrarToast(
             "Erro ao salvar configurações."
         );
+        
+    }
+
+}
+
+/* ============================================================
+   LOCAIS DE ESTOQUE
+============================================================ */
+
+function configurarLocais() {
+
+    document.getElementById("location-form")
+        ?.addEventListener("submit", salvarLocal);
+
+    document.getElementById("cancel-location-edit")
+        ?.addEventListener("click", limparFormularioLocal);
+
+    document.getElementById("locations-list")
+        ?.addEventListener("click", async (event) => {
+
+            const botao = event.target.closest("[data-location-action]");
+
+            if (!botao) return;
+
+            const id = botao.dataset.id;
+            const acao = botao.dataset.locationAction;
+
+            if (acao === "editar") {
+                editarLocal(id);
+            }
+
+            if (acao === "excluir") {
+                await excluirLocal(id);
+            }
+        });
+}
+
+
+async function salvarLocal(event) {
+
+    event.preventDefault();
+
+    const id = document.getElementById("location-id").value;
+
+    const nome = document.getElementById("location-name")
+        .value.trim();
+
+    if (!nome) {
+        mostrarToast("Informe o nome do local.");
+        return;
+    }
+
+    const nomeDuplicado = Object.entries(locais).some(
+        ([localId, local]) =>
+            localId !== id &&
+            local.nome.toLowerCase() === nome.toLowerCase()
+    );
+
+    if (nomeDuplicado) {
+        mostrarToast("Já existe um local com esse nome.");
+        return;
+    }
+
+    try {
+
+        if (id) {
+
+            await update(ref(database, `locais/${id}`), {
+                nome,
+                atualizadoEm: agora()
+            });
+
+        } else {
+
+            const novoLocal = push(ref(database, "locais"));
+
+            await set(novoLocal, {
+                nome,
+                criadoEm: agora()
+            });
+        }
+
+        limparFormularioLocal();
+        await recarregarLocais();
+
+        mostrarToast("Local salvo com sucesso.");
+
+    } catch (error) {
+
+        console.error(error);
+        mostrarToast("Erro ao salvar local.");
 
     }
+}
+
+
+function editarLocal(id) {
+
+    const local = locais[id];
+
+    if (!local) return;
+
+    document.getElementById("location-id").value = id;
+    document.getElementById("location-name").value = local.nome;
+
+    document.getElementById("location-name").focus();
+}
+
+
+function limparFormularioLocal() {
+
+    document.getElementById("location-form").reset();
+    document.getElementById("location-id").value = "";
+
+}
+
+
+async function excluirLocal(id) {
+
+    const local = locais[id];
+
+    if (!local) return;
+
+    try {
+
+        // Não permite excluir um local que ainda tenha estoque.
+        const estoqueSnapshot = await get(ref(database, "estoque"));
+        const estoque = estoqueSnapshot.val() || {};
+
+        const possuiEstoque = Object.values(estoque).some(
+            produto => Object.values(produto || {}).some(
+                variacao => Number(variacao?.[id] || 0) > 0
+            )
+        );
+
+        if (possuiEstoque) {
+            mostrarToast(
+                "Este local possui produtos. Transfira o estoque antes de excluí-lo."
+            );
+            return;
+        }
+
+        if (!confirm(`Deseja excluir o local "${local.nome}"?`)) {
+            return;
+        }
+
+        await remove(ref(database, `locais/${id}`));
+
+        await recarregarLocais();
+
+        mostrarToast("Local excluído.");
+
+    } catch (error) {
+
+        console.error(error);
+        mostrarToast("Erro ao excluir local.");
+
+    }
+}
+
+
+async function recarregarLocais() {
+
+    const snapshot = await get(ref(database, "locais"));
+
+    locais = snapshot.val() || {};
+
+    atualizarLocais();
+
+}
+
+
+function atualizarLocais() {
+
+    const container = document.getElementById("locations-list");
+
+    if (!container) return;
+
+    const lista = Object.entries(locais);
+
+    if (!lista.length) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                Nenhum local cadastrado.
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML = lista.map(([id, local]) => `
+
+        <div class="settings-item">
+
+            <strong>${escaparHTML(local.nome)}</strong>
+
+            <div class="settings-actions">
+
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-location-action="editar"
+                    data-id="${id}">
+                    Editar
+                </button>
+
+                <button
+                    type="button"
+                    class="btn btn-danger"
+                    data-location-action="excluir"
+                    data-id="${id}">
+                    Excluir
+                </button>
+
+            </div>
+
+        </div>
+
+    `).join("");
 
 }
