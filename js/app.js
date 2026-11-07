@@ -2474,7 +2474,6 @@ async function movimentarEstoque(tipo) {
             ref(database, `produtos/${produtoId}`),
             {
                 estoque: total,
-                document.getElementById("stock-quantity").value = total;
                 estoqueAtualizadoEm: agora()
             }
         );
