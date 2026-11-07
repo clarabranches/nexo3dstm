@@ -879,7 +879,15 @@ async function salvarFormularioProduto(
             "product-category"
         ).value;
 
-
+    const cores = [...new Set(
+        document.getElementById("product-colors")
+            .value
+            .split(",")
+            .map(cor => cor.trim())
+            .filter(Boolean)
+        )
+    ];
+    
     const categoria =
         categorias[
             categoriaId
