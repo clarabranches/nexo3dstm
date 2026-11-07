@@ -233,6 +233,36 @@
                                     <label for="product-description">Descrição</label>
                                     <textarea id="product-description" rows="4" placeholder="Descrição do produto..."></textarea>
                                 </div>
+                                                                <!-- VARIAÇÕES DE CORES -->
+                                <div class="panel">
+                                
+                                    <div class="panel-header">
+                                        <div>
+                                            <h3>Variações de cores</h3>
+                                            <p>Produtos sem variação podem deixar este campo vazio.</p>
+                                        </div>
+                                    </div>
+                                
+                                    <div class="form-group">
+                                
+                                        <label for="product-colors">
+                                            Cores disponíveis
+                                        </label>
+                                
+                                        <input
+                                            type="text"
+                                            id="product-colors"
+                                            placeholder="Ex.: Preto, Branco, Vermelho, Azul"
+                                        >
+                                
+                                        <small>
+                                            Separe as cores por vírgula. Se não houver variações,
+                                            deixe o campo vazio.
+                                        </small>
+                                
+                                    </div>
+                                
+                                </div>
                             </div>
                         </div>
 
@@ -426,6 +456,45 @@
                         </div>
                     </form>
                     <div id="categories-list" class="settings-list"></div>
+                    <!-- LOCAIS DE ESTOQUE -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <div>
+                                <h3>Locais de estoque</h3>
+                                <p>Cadastre e gerencie os locais onde seus produtos ficam armazenados.</p>
+                            </div>
+                        </div>
+                    
+                        <form id="location-form">
+                            <input type="hidden" id="location-id">
+                    
+                            <div class="inline-form">
+                                <div class="form-group">
+                                    <label for="location-name">Nome do local</label>
+                                    <input
+                                        type="text"
+                                        id="location-name"
+                                        placeholder="Ex.: Loja, Ateliê ou Depósito"
+                                        required
+                                    >
+                                </div>
+                    
+                                <button type="submit" class="btn btn-primary">
+                                    Salvar local
+                                </button>
+                    
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    id="cancel-location-edit"
+                                >
+                                    Cancelar
+                                </button>
+                            </div>
+                        </form>
+                    
+                        <div id="locations-list" class="settings-list"></div>
+                    </div>
                 </div>
             </section>
         </main>
