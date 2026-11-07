@@ -779,9 +779,9 @@ async function salvarFormularioProduto(event) {
 
         ),
 
-        estoque: numero(
-            document.getElementById("stock-quantity").value
-        ),
+        estoque: produtoEditandoId
+            ? totalEstoqueProduto(produtoEditandoId)
+            : 0,
 
         custoMaquina: calculo.maquina,
 
@@ -864,8 +864,8 @@ function abrirEdicaoProduto(id) {
     document.getElementById("print-hours").value =
         produto.horasImpressao || 0;
 
-    document.getElementById("produced-quantity").value =
-        produto.produzido || 0;
+    document.getElementById("stock-quantity").value =
+        totalEstoqueProduto(id);
 
     document.getElementById("stock-quantity").value =
         produto.estoque || 0;
@@ -922,7 +922,7 @@ function abrirEdicaoProduto(id) {
     }
 
     atualizarCalculo();
-
+    atualizarPainelEstoque();
     abrirAba("cadastro");
 
 }
@@ -981,8 +981,8 @@ function limparFormularioProduto() {
         "";
 
     adicionarLinhaFilamento();
-
     atualizarCalculo();
+    atualizarPainelEstoque();
 
 }
 
@@ -2052,7 +2052,7 @@ function atualizarOpcoesCoresTransferencia() {
 
 async function transferirEstoque() {
 
-    const produtoId = document.getElementById("transfer-product")?.value;
+    const produtoId = produtoEditandoId;
     const corKey = document.getElementById("transfer-color")?.value || "__sem_cor";
     const origemId = document.getElementById("transfer-from")?.value;
     const destinoId = document.getElementById("transfer-to")?.value;
@@ -2218,8 +2218,7 @@ function renderizarResumoEstoque() {
         return;
     }
 
-    const produtoId =
-        document.getElementById("inventory-product")?.value;
+    const produtoId = produtoEditandoId;
 
     const produto = produtos[produtoId];
 
@@ -2353,14 +2352,11 @@ function renderizarResumoEstoque() {
 
 async function movimentarEstoque(tipo) {
 
-    const produtoId =
-        document.getElementById("inventory-product")?.value;
+    const produtoId = produtoEditandoId;
 
-    const corKey =
-        document.getElementById("inventory-color")?.value || "__sem_cor";
+    const corKey = document.getElementById("inventory-color")?.value || "__sem_cor";
 
-    const localId =
-        document.getElementById("inventory-location")?.value;
+    const localId = document.getElementById("inventory-location")?.value;
 
     const quantidade = Math.floor(
 
@@ -2478,9 +2474,11 @@ async function movimentarEstoque(tipo) {
             ref(database, `produtos/${produtoId}`),
             {
                 estoque: total,
+                document.getElementById("stock-quantity").value = total;
                 estoqueAtualizadoEm: agora()
             }
         );
+        document.getElementById("stock-quantity").value = total;
 
         await set(
             push(ref(database, "movimentacoesEstoque")),
