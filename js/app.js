@@ -2,7 +2,6 @@ import {
     database
 } from "./firebase-config.js";
 
-
 import {
     ref,
     get,
@@ -13,7 +12,6 @@ import {
     runTransaction
 } from "https://www.gstatic.com/firebasejs/13.1.0/firebase-database.js";
 
-
 import {
     observarProdutos,
     salvarProduto,
@@ -23,12 +21,10 @@ import {
     obterProdutos
 } from "./produtos.js";
 
-
 import {
     calcularProduto,
     atualizarVisualPrecificacao
 } from "./precificacao.js";
-
 
 import {
     numero,
@@ -38,7 +34,6 @@ import {
     escaparHTML,
     agora
 } from "./utils.js";
-
 
 /*
  * ============================================================
@@ -51,9 +46,9 @@ let categorias = {};
 let filamentos = {};
 let configuracoes = {};
 let produtoEditandoId = null;
+let precoVendaManual = false;
 let locais = {};
 let estoquePorProduto = {};
-
 
 /*
  * ============================================================
@@ -75,8 +70,10 @@ async function iniciar() {
     configurarFiltros();
     configurarUploadImagem();
     adicionarLinhaFilamento();
+    atualizarCalculo();
 
     await carregarDados();
+    atualizarCalculo();
 
     observarProdutos((dados) => {
         produtos = dados || {};
@@ -84,13 +81,13 @@ async function iniciar() {
     });
 }
 
-
 async function carregarDados() {
     try {
         const [
             categoriasSnapshot,
             filamentosSnapshot,
             configuracoesSnapshot,
+
             locaisSnapshot,
             estoqueSnapshot
         ] = await Promise.all([
@@ -119,7 +116,6 @@ async function carregarDados() {
     }
 }
 
-
 function configurarMenu() {
     const botoes = document.querySelectorAll(".menu-item");
 
@@ -138,7 +134,6 @@ function configurarMenu() {
     });
 }
 
-
 function abrirAba(tab) {
 
     document.querySelectorAll(".tab-content").forEach((elemento) => {
@@ -153,6 +148,7 @@ function abrirAba(tab) {
 
     document.querySelectorAll(".menu-item").forEach((botao) => {
         botao.classList.toggle(
+
             "active",
             botao.dataset.tab === tab
         );
@@ -184,13 +180,13 @@ function abrirAba(tab) {
 
     if (titulo) {
         document.getElementById("page-title").textContent = titulo[0];
+
         document.getElementById("page-subtitle").textContent = titulo[1];
     }
 
     const sidebar = document.querySelector(".sidebar");
     sidebar?.classList.remove("mobile-open");
 }
-
 
 /*
  * ============================================================
@@ -212,14 +208,14 @@ function configurarAcoes() {
         const card = event.target.closest(".product-card");
 
         if (card) {
-            abrirEdicaoProduto(card.dataset.productid);
+            abrirEdicaoProduto(card.dataset.productId);
             return;
         }
 
         const recente = event.target.closest(".recent-item");
 
         if (recente) {
-            abrirEdicaoProduto(recente.dataset.productid);
+            abrirEdicaoProduto(recente.dataset.productId);
         }
     });
 
@@ -236,7 +232,6 @@ function configurarAcoes() {
         }
     );
 }
-
 
 function executarAcao(action) {
 
@@ -259,7 +254,6 @@ function executarAcao(action) {
 
 }
 
-
 /*
  * ============================================================
  * PRODUTOS
@@ -273,7 +267,6 @@ function atualizarInterface() {
     atualizarPainelEstoque();
 
 }
-
 
 function atualizarListaProdutos() {
 
@@ -338,7 +331,6 @@ function atualizarListaProdutos() {
 
 }
 
-
 function atualizarDashboard() {
 
     const lista = Object.values(produtos);
@@ -370,6 +362,7 @@ function atualizarDashboard() {
             );
 
             return total + quantidade;
+
         },
         0
     );
@@ -392,7 +385,6 @@ function atualizarDashboard() {
     );
 
 }
-
 
 /*
  * ============================================================
@@ -422,7 +414,6 @@ function configurarFiltros() {
 
 }
 
-
 /*
  * ============================================================
  * FORMULÁRIO DE PRODUTO
@@ -432,9 +423,17 @@ function configurarFiltros() {
 function configurarFormularioProduto() {
 
     document.getElementById("product-form")?.addEventListener(
+
         "submit",
         salvarFormularioProduto
     );
+
+    const campoPrecoVenda = document.getElementById("sale-price");
+
+    campoPrecoVenda?.addEventListener("input", () => {
+        precoVendaManual = true;
+        atualizarLucroPrecoManual();
+    });
 
     [
         "product-category",
@@ -465,7 +464,6 @@ function configurarFormularioProduto() {
 
 }
 
-
 /*
  * ============================================================
  * LINHA DE FILAMENTO
@@ -494,6 +492,7 @@ function adicionarLinhaFilamento(dados = null) {
             </label>
 
             <select
+
                 class="product-filament"
                 required>
 
@@ -523,7 +522,6 @@ function adicionarLinhaFilamento(dados = null) {
 
         </div>
 
-
         <div class="form-group">
 
             <label>
@@ -541,7 +539,6 @@ function adicionarLinhaFilamento(dados = null) {
 
         </div>
 
-
         <button
             type="button"
             class="icon-button danger remove-filament"
@@ -556,6 +553,7 @@ function adicionarLinhaFilamento(dados = null) {
     container.appendChild(row);
 
     row.querySelector(".remove-filament").addEventListener(
+
         "click",
         () => {
             row.remove();
@@ -571,7 +569,6 @@ function adicionarLinhaFilamento(dados = null) {
     });
 
 }
-
 
 /*
  * ============================================================
@@ -608,7 +605,6 @@ function obterFilamentosFormulario() {
 
 }
 
-
 /*
  * ============================================================
  * CALCULAR
@@ -633,10 +629,47 @@ function atualizarCalculo() {
 
     const calculo = calcularProduto(dados);
 
+    const campoPrecoVenda = document.getElementById("sale-price");
+
+    if (precoVendaManual && campoPrecoVenda) {
+        calculo.precoVenda = Math.max(0, numero(campoPrecoVenda.value));
+        calculo.lucro = calculo.precoVenda - calculo.custoProducao;
+    }
+
     atualizarVisualPrecificacao(calculo);
+
+    if (campoPrecoVenda && !precoVendaManual) {
+        campoPrecoVenda.value = numero(calculo.precoVenda).toFixed(2);
+    }
 
 }
 
+function atualizarLucroPrecoManual() {
+
+    const campoPrecoVenda = document.getElementById("sale-price");
+    const campoLucro = document.getElementById("profit-value");
+
+    if (!campoPrecoVenda || !campoLucro) {
+        return;
+    }
+
+    const dados = {
+        horasImpressao: numero(
+            document.getElementById("print-hours")?.value
+        ),
+        filamentos: obterFilamentosFormulario(),
+        configuracoes,
+        filamentosCadastrados: filamentos
+    };
+
+    const calculo = calcularProduto(dados);
+    const preco = Math.max(0, numero(campoPrecoVenda.value));
+
+    campoLucro.textContent = formatarMoeda(
+        preco - calculo.custoProducao
+    );
+
+}
 
 /*
  * ============================================================
@@ -649,6 +682,7 @@ async function salvarFormularioProduto(event) {
     event.preventDefault();
 
     const categoriaId =
+
         document.getElementById("product-category").value;
 
     const campoCores =
@@ -742,6 +776,7 @@ async function salvarFormularioProduto(event) {
 
         produzido: numero(
             document.getElementById("produced-quantity").value
+
         ),
 
         estoque: numero(
@@ -758,9 +793,13 @@ async function salvarFormularioProduto(event) {
 
         custoProducao: calculo.custoProducao,
 
-        precoVenda: calculo.precoVenda,
+        precoVenda: Math.max(
+            0,
+            numero(document.getElementById("sale-price").value)
+        ),
 
-        lucro: calculo.lucro
+        lucro: numero(document.getElementById("sale-price").value) -
+            calculo.custoProducao
 
     };
 
@@ -778,7 +817,6 @@ async function salvarFormularioProduto(event) {
     }
 
 }
-
 
 /*
  * ============================================================
@@ -854,6 +892,14 @@ function abrirEdicaoProduto(id) {
 
     }
 
+    const campoPrecoVenda = document.getElementById("sale-price");
+
+    if (campoPrecoVenda) {
+        campoPrecoVenda.value = numero(produto.precoVenda).toFixed(2);
+        precoVendaManual = produto.precoVenda !== undefined &&
+            produto.precoVenda !== null;
+    }
+
     const container =
         document.getElementById("filaments-container");
 
@@ -866,6 +912,7 @@ function abrirEdicaoProduto(id) {
 
         produto.filamentos.forEach((item) => {
             adicionarLinhaFilamento(item);
+
         });
 
     } else {
@@ -880,7 +927,6 @@ function abrirEdicaoProduto(id) {
 
 }
 
-
 /*
  * ============================================================
  * LIMPAR FORMULÁRIO
@@ -890,6 +936,7 @@ function abrirEdicaoProduto(id) {
 function limparFormularioProduto() {
 
     produtoEditandoId = null;
+    precoVendaManual = false;
 
     const form =
         document.getElementById("product-form");
@@ -897,6 +944,7 @@ function limparFormularioProduto() {
     form?.reset();
 
     document.getElementById("form-title").textContent =
+
         "Novo produto";
 
     document.getElementById("product-id").value =
@@ -937,7 +985,6 @@ function limparFormularioProduto() {
     atualizarCalculo();
 
 }
-
 
 /*
  * ============================================================
@@ -990,7 +1037,6 @@ function configurarUploadImagem() {
 
 }
 
-
 /*
  * ============================================================
  * CATEGORIAS
@@ -1005,7 +1051,6 @@ function configurarCategorias() {
     );
 
 }
-
 
 async function salvarCategoria(event) {
 
@@ -1064,7 +1109,6 @@ async function salvarCategoria(event) {
 
 }
 
-
 async function recarregarCategorias() {
 
     const snapshot = await get(
@@ -1079,10 +1123,10 @@ async function recarregarCategorias() {
 
 }
 
-
 function atualizarCategorias() {
 
     const selectProduto =
+
         document.getElementById("product-category");
 
     const selectFiltro =
@@ -1135,7 +1179,6 @@ function atualizarCategorias() {
     renderizarListaCategorias();
 
 }
-
 
 function renderizarListaCategorias() {
 
@@ -1206,7 +1249,6 @@ function renderizarListaCategorias() {
 
 }
 
-
 async function excluirCategoria(id) {
 
     const categoria = categorias[id];
@@ -1233,7 +1275,6 @@ async function excluirCategoria(id) {
 
 }
 
-
 /*
  * ============================================================
  * FILAMENTOS
@@ -1248,7 +1289,6 @@ function configurarFilamentos() {
     );
 
 }
-
 
 async function salvarFilamento(event) {
 
@@ -1313,7 +1353,6 @@ async function salvarFilamento(event) {
 
 }
 
-
 async function recarregarFilamentos() {
 
     const snapshot = await get(
@@ -1336,11 +1375,9 @@ async function recarregarFilamentos() {
 
 }
 
-
 function atualizarFilamentos() {
     renderizarListaFilamentos();
 }
-
 
 function renderizarListaFilamentos() {
 
@@ -1362,6 +1399,7 @@ function renderizarListaFilamentos() {
         `;
 
         return;
+
     }
 
     container.innerHTML = lista.map(([id, filament]) => `
@@ -1409,7 +1447,6 @@ function renderizarListaFilamentos() {
 
 }
 
-
 async function excluirFilamento(id) {
 
     const filament = filamentos[id];
@@ -1424,6 +1461,7 @@ async function excluirFilamento(id) {
 
     if (!confirmar) {
         return;
+
     }
 
     await remove(
@@ -1435,7 +1473,6 @@ async function excluirFilamento(id) {
     mostrarToast("Filamento excluído.");
 
 }
-
 
 /*
  * ============================================================
@@ -1451,7 +1488,6 @@ function configurarConfiguracoes() {
     );
 
 }
-
 
 function carregarConfiguracoes() {
 
@@ -1471,7 +1507,6 @@ function carregarConfiguracoes() {
         configuracoes.margemLucro ?? 0;
 
 }
-
 
 async function salvarConfiguracoes(event) {
 
@@ -1524,7 +1559,6 @@ async function salvarConfiguracoes(event) {
 
 }
 
-
 /*
  * ============================================================
  * LOCAIS DE ESTOQUE
@@ -1548,6 +1582,7 @@ function configurarLocais() {
         async (event) => {
 
             const botao =
+
                 event.target.closest("[data-location-action]");
 
             if (!botao) {
@@ -1570,7 +1605,6 @@ function configurarLocais() {
 
 }
 
-
 async function salvarLocal(event) {
 
     event.preventDefault();
@@ -1579,6 +1613,7 @@ async function salvarLocal(event) {
         document.getElementById("location-id").value;
 
     const nome =
+
         document.getElementById("location-name").value.trim();
 
     if (!nome) {
@@ -1638,7 +1673,6 @@ async function salvarLocal(event) {
 
 }
 
-
 function editarLocal(id) {
 
     const local = locais[id];
@@ -1657,7 +1691,6 @@ function editarLocal(id) {
 
 }
 
-
 function limparFormularioLocal() {
 
     document.getElementById("location-form").reset();
@@ -1666,7 +1699,6 @@ function limparFormularioLocal() {
         "";
 
 }
-
 
 async function excluirLocal(id) {
 
@@ -1722,7 +1754,6 @@ async function excluirLocal(id) {
 
 }
 
-
 async function recarregarLocais() {
 
     const snapshot = await get(
@@ -1736,7 +1767,6 @@ async function recarregarLocais() {
     atualizarPainelEstoque();
 
 }
-
 
 function atualizarLocais() {
 
@@ -1802,7 +1832,6 @@ function atualizarLocais() {
 
 }
 
-
 /*
  * ============================================================
  * ESTOQUE POR LOCAL, VARIAÇÕES E BAIXA DE VENDAS
@@ -1819,7 +1848,6 @@ function atualizarLocais() {
  *
  */
 
-
 function configurarEstoque() {
 
     const abaProdutos =
@@ -1827,6 +1855,7 @@ function configurarEstoque() {
 
     if (!abaProdutos) {
         return;
+
     }
 
     let painel =
@@ -1857,7 +1886,6 @@ function configurarEstoque() {
 
             </div>
 
-
             <div class="form-grid">
 
                 <div class="form-group">
@@ -1876,7 +1904,6 @@ function configurarEstoque() {
 
                 </div>
 
-
                 <div class="form-group">
 
                     <label for="inventory-color">
@@ -1892,7 +1919,6 @@ function configurarEstoque() {
                     </select>
 
                 </div>
-
 
                 <div class="form-group">
 
@@ -1910,7 +1936,6 @@ function configurarEstoque() {
 
                 </div>
 
-
                 <div class="form-group">
 
                     <label for="inventory-quantity">
@@ -1920,6 +1945,7 @@ function configurarEstoque() {
                     <input
                         id="inventory-quantity"
                         type="number"
+
                         min="1"
                         step="1"
                         value="1"
@@ -1928,7 +1954,6 @@ function configurarEstoque() {
                 </div>
 
             </div>
-
 
             <div class="form-actions">
 
@@ -1952,10 +1977,59 @@ function configurarEstoque() {
 
             </div>
 
-
             <div
                 id="inventory-summary"
                 class="inventory-summary">
+            </div>
+
+            <div class="panel transfer-panel" style="margin-top:24px;">
+                <div class="panel-header">
+                    <div>
+                        <h3>Transferência de estoque</h3>
+                        <p>Transfira unidades entre locais sem alterar o estoque total.</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="transfer-product">Produto</label>
+                        <select id="transfer-product">
+                            <option value="">Selecione um produto</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="transfer-color">Cor / variação</label>
+                        <select id="transfer-color">
+                            <option value="__sem_cor">Sem variação</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="transfer-from">Local de origem</label>
+                        <select id="transfer-from">
+                            <option value="">Selecione a origem</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="transfer-to">Local de destino</label>
+                        <select id="transfer-to">
+                            <option value="">Selecione o destino</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="transfer-quantity">Quantidade</label>
+                        <input id="transfer-quantity" type="number" min="1" step="1" value="1">
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" id="transfer-submit">
+                        Transferir estoque
+                    </button>
+                </div>
             </div>
 
         `;
@@ -1993,10 +2067,215 @@ function configurarEstoque() {
         () => movimentarEstoque("venda")
     );
 
+    document.getElementById("transfer-product")?.addEventListener(
+        "change",
+        atualizarOpcoesCoresTransferencia
+    );
+
+    document.getElementById("transfer-submit")?.addEventListener(
+        "click",
+        transferirEstoque
+    );
+
     atualizarPainelEstoque();
 
 }
 
+function atualizarPainelTransferencia() {
+
+    const selectProduto = document.getElementById("transfer-product");
+    const selectOrigem = document.getElementById("transfer-from");
+    const selectDestino = document.getElementById("transfer-to");
+
+    if (!selectProduto || !selectOrigem || !selectDestino) {
+        return;
+    }
+
+    const produtoAtual = selectProduto.value;
+    const origemAtual = selectOrigem.value;
+    const destinoAtual = selectDestino.value;
+
+    selectProduto.innerHTML = `
+        <option value="">Selecione um produto</option>
+        ${Object.entries(produtos).map(([id, produto]) => `
+            <option value="${escaparHTML(id)}">
+                ${escaparHTML(produto.nome || "Produto sem nome")}
+            </option>
+        `).join("")}
+    `;
+
+    selectOrigem.innerHTML = `
+        <option value="">Selecione a origem</option>
+        ${Object.entries(locais).map(([id, local]) => `
+            <option value="${escaparHTML(id)}">
+                ${escaparHTML(local.nome || "Local")}
+            </option>
+        `).join("")}
+    `;
+
+    selectDestino.innerHTML = `
+        <option value="">Selecione o destino</option>
+        ${Object.entries(locais).map(([id, local]) => `
+            <option value="${escaparHTML(id)}">
+                ${escaparHTML(local.nome || "Local")}
+            </option>
+        `).join("")}
+    `;
+
+    if (produtos[produtoAtual]) {
+        selectProduto.value = produtoAtual;
+    }
+    if (locais[origemAtual]) {
+        selectOrigem.value = origemAtual;
+    }
+    if (locais[destinoAtual]) {
+        selectDestino.value = destinoAtual;
+    }
+
+    atualizarOpcoesCoresTransferencia();
+
+}
+
+function atualizarOpcoesCoresTransferencia() {
+
+    const selectProduto = document.getElementById("transfer-product");
+    const selectCor = document.getElementById("transfer-color");
+
+    if (!selectProduto || !selectCor) {
+        return;
+    }
+
+    const produto = produtos[selectProduto.value];
+    const corAtual = selectCor.value;
+    const cores = obterCoresProduto(produto);
+
+    if (!cores.length) {
+        selectCor.innerHTML = `
+            <option value="__sem_cor">Sem variação</option>
+        `;
+        selectCor.value = "__sem_cor";
+        return;
+    }
+
+    selectCor.innerHTML = cores.map(cor => `
+        <option value="${escaparHTML(chaveCorEstoque(cor))}">
+            ${escaparHTML(cor)}
+        </option>
+    `).join("");
+
+    if (cores.some(cor => chaveCorEstoque(cor) === corAtual)) {
+        selectCor.value = corAtual;
+    }
+
+}
+
+async function transferirEstoque() {
+
+    const produtoId = document.getElementById("transfer-product")?.value;
+    const corKey = document.getElementById("transfer-color")?.value || "__sem_cor";
+    const origemId = document.getElementById("transfer-from")?.value;
+    const destinoId = document.getElementById("transfer-to")?.value;
+    const quantidade = Math.floor(
+        numero(document.getElementById("transfer-quantity")?.value)
+    );
+
+    if (!produtoId || !produtos[produtoId]) {
+        mostrarToast("Selecione um produto para transferir.");
+        return;
+    }
+
+    if (!origemId || !locais[origemId]) {
+        mostrarToast("Selecione o local de origem.");
+        return;
+    }
+
+    if (!destinoId || !locais[destinoId]) {
+        mostrarToast("Selecione o local de destino.");
+        return;
+    }
+
+    if (origemId === destinoId) {
+        mostrarToast("A origem e o destino precisam ser diferentes.");
+        return;
+    }
+
+    if (!Number.isFinite(quantidade) || quantidade < 1) {
+        mostrarToast("Informe uma quantidade válida.");
+        return;
+    }
+
+    const produto = produtos[produtoId];
+    const cores = obterCoresProduto(produto);
+    const corValida = corKey === "__sem_cor"
+        ? cores.length === 0
+        : cores.some(cor => chaveCorEstoque(cor) === corKey);
+
+    if (!corValida) {
+        mostrarToast("A cor selecionada não pertence a esse produto.");
+        return;
+    }
+
+    try {
+        const caminhoCor = `estoque/${produtoId}/${corKey}`;
+
+        // A transação no nível da cor atualiza origem e destino atomicamente.
+        const resultado = await runTransaction(
+            ref(database, caminhoCor),
+            atual => {
+                const estoque = atual || {};
+                const disponivel = numero(estoque[origemId]);
+
+                if (disponivel < quantidade) {
+                    return;
+                }
+
+                return {
+                    ...estoque,
+                    [origemId]: disponivel - quantidade,
+                    [destinoId]: numero(estoque[destinoId]) + quantidade
+                };
+            }
+        );
+
+        if (!resultado.committed) {
+            mostrarToast("Estoque insuficiente no local de origem.");
+            return;
+        }
+
+        const corNome = cores.length
+            ? cores.find(cor => chaveCorEstoque(cor) === corKey) || ""
+            : "";
+
+        await set(
+            push(ref(database, "movimentacoesEstoque")),
+            {
+                produtoId,
+                produtoNome: produto.nome || "",
+                cor: corNome,
+                tipo: "transferencia",
+                quantidade,
+                localOrigemId: origemId,
+                localOrigemNome: locais[origemId].nome || "",
+                localDestinoId: destinoId,
+                localDestinoNome: locais[destinoId].nome || "",
+                criadoEm: agora()
+            }
+        );
+
+        const snapshot = await get(ref(database, "estoque"));
+        estoquePorProduto = snapshot.val() || {};
+
+        atualizarPainelEstoque();
+        atualizarDashboard();
+
+        mostrarToast("Estoque transferido com sucesso.");
+
+    } catch (error) {
+        console.error("Erro ao transferir estoque:", error);
+        mostrarToast("Não foi possível realizar a transferência.");
+    }
+
+}
 
 function chaveCorEstoque(cor) {
 
@@ -2010,7 +2289,6 @@ function chaveCorEstoque(cor) {
 
 }
 
-
 function obterCoresProduto(produto) {
 
     return Array.isArray(produto?.cores)
@@ -2020,7 +2298,6 @@ function obterCoresProduto(produto) {
         : [];
 
 }
-
 
 function atualizarPainelEstoque() {
 
@@ -2044,6 +2321,7 @@ function atualizarPainelEstoque() {
         </option>
 
         ${Object.entries(produtos)
+
             .map(([id, produto]) => `
 
                 <option value="${escaparHTML(id)}">
@@ -2082,11 +2360,11 @@ function atualizarPainelEstoque() {
     }
 
     atualizarOpcoesCoresEstoque();
+    atualizarPainelTransferencia();
 
     renderizarResumoEstoque();
 
 }
-
 
 function atualizarOpcoesCoresEstoque() {
 
@@ -2137,7 +2415,6 @@ function atualizarOpcoesCoresEstoque() {
 
 }
 
-
 function quantidadeEstoque(produtoId, corKey, localId) {
 
     return numero(
@@ -2145,7 +2422,6 @@ function quantidadeEstoque(produtoId, corKey, localId) {
     );
 
 }
-
 
 function totalEstoqueProduto(produtoId) {
 
@@ -2166,7 +2442,6 @@ function totalEstoqueProduto(produtoId) {
     );
 
 }
-
 
 function renderizarResumoEstoque() {
 
@@ -2310,7 +2585,6 @@ function renderizarResumoEstoque() {
 
 }
 
-
 async function movimentarEstoque(tipo) {
 
     const produtoId =
@@ -2323,6 +2597,7 @@ async function movimentarEstoque(tipo) {
         document.getElementById("inventory-location")?.value;
 
     const quantidade = Math.floor(
+
         numero(
             document.getElementById("inventory-quantity")?.value
         )
@@ -2385,6 +2660,7 @@ async function movimentarEstoque(tipo) {
 
                     if (disponivel < quantidade) {
                         return;
+
                     }
 
                     return disponivel - quantidade;
@@ -2416,6 +2692,7 @@ async function movimentarEstoque(tipo) {
         );
 
         const inventarioAtual =
+
             snapshot.val() || {};
 
         const total = Object.values(inventarioAtual).reduce(
@@ -2478,6 +2755,7 @@ async function movimentarEstoque(tipo) {
         atualizarDashboard();
 
         mostrarToast(
+
             tipo === "venda"
                 ? "Venda registrada e estoque atualizado."
                 : "Estoque atualizado com sucesso."
