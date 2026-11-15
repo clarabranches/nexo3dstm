@@ -176,6 +176,10 @@ export function calcularCustoProducao(
 
         numero(
             custos.filamentos
+        ) +
+
+        numero(
+            custos.extra
         )
 
     );
@@ -287,6 +291,12 @@ export function calcularProduto(
         );
 
 
+    const custosExtras =
+        numero(
+            dados.custosExtras
+        );
+
+
     const custoProducao =
         calcularCustoProducao({
 
@@ -300,7 +310,10 @@ export function calcularProduto(
                 embalagem,
 
             filamentos:
-                filamentos
+                filamentos,
+
+            extra:
+                custosExtras
 
         });
 
@@ -332,6 +345,9 @@ export function calcularProduto(
 
         filamentos:
             filamentos,
+
+        extra:
+            custosExtras,
 
         custoProducao:
             custoProducao,

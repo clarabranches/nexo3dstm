@@ -439,7 +439,8 @@ function configurarFormularioProduto() {
         "product-category",
         "print-hours",
         "produced-quantity",
-        "stock-quantity"
+        "stock-quantity",
+        "extra-cost"
     ].forEach((id) => {
 
         document.getElementById(id)?.addEventListener(
@@ -623,7 +624,11 @@ function atualizarCalculo() {
 
         configuracoes: configuracoes,
 
-        filamentosCadastrados: filamentos
+        filamentosCadastrados: filamentos,
+
+        custosExtras: numero(
+            document.getElementById("extra-cost")?.value
+        )
 
     };
 
@@ -659,7 +664,10 @@ function atualizarLucroPrecoManual() {
         ),
         filamentos: obterFilamentosFormulario(),
         configuracoes,
-        filamentosCadastrados: filamentos
+        filamentosCadastrados: filamentos,
+        custosExtras: numero(
+            document.getElementById("extra-cost")?.value
+        )
     };
 
     const calculo = calcularProduto(dados);
@@ -722,7 +730,11 @@ async function salvarFormularioProduto(event) {
 
         configuracoes: configuracoes,
 
-        filamentosCadastrados: filamentos
+        filamentosCadastrados: filamentos,
+
+        custosExtras: numero(
+            document.getElementById("extra-cost")?.value
+        )
 
     };
 
@@ -790,6 +802,8 @@ async function salvarFormularioProduto(event) {
         custoFilamentos: calculo.filamentos,
 
         custoEmbalagem: calculo.embalagem,
+
+        custoExtra: calculo.extra,
 
         custoProducao: calculo.custoProducao,
 
@@ -863,6 +877,14 @@ function abrirEdicaoProduto(id) {
 
     document.getElementById("print-hours").value =
         produto.horasImpressao || 0;
+
+    const campoCustoExtra =
+        document.getElementById("extra-cost");
+
+    if (campoCustoExtra) {
+        campoCustoExtra.value =
+            numero(produto.custoExtra).toFixed(2);
+    }
 
     document.getElementById("stock-quantity").value =
         totalEstoqueProduto(id);
