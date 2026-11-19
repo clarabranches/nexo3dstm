@@ -438,6 +438,7 @@ function configurarFormularioProduto() {
     [
         "product-category",
         "print-hours",
+        "labor-hours",
         "produced-quantity",
         "stock-quantity",
         "extra-cost"
@@ -620,6 +621,10 @@ function atualizarCalculo() {
             document.getElementById("print-hours")?.value
         ),
 
+        horasMaoDeObra: numero(
+            document.getElementById("labor-hours")?.value
+        ),
+
         filamentos: obterFilamentosFormulario(),
 
         configuracoes: configuracoes,
@@ -661,6 +666,9 @@ function atualizarLucroPrecoManual() {
     const dados = {
         horasImpressao: numero(
             document.getElementById("print-hours")?.value
+        ),
+        horasMaoDeObra: numero(
+            document.getElementById("labor-hours")?.value
         ),
         filamentos: obterFilamentosFormulario(),
         configuracoes,
@@ -726,6 +734,10 @@ async function salvarFormularioProduto(event) {
             document.getElementById("print-hours").value
         ),
 
+        horasMaoDeObra: numero(
+            document.getElementById("labor-hours")?.value
+        ),
+
         filamentos: obterFilamentosFormulario(),
 
         configuracoes: configuracoes,
@@ -781,6 +793,8 @@ async function salvarFormularioProduto(event) {
             "",
 
         horasImpressao: dadosCalculo.horasImpressao,
+
+        horasMaoDeObra: dadosCalculo.horasMaoDeObra,
 
         filamentos: dadosCalculo.filamentos,
 
@@ -877,6 +891,9 @@ function abrirEdicaoProduto(id) {
 
     document.getElementById("print-hours").value =
         produto.horasImpressao || 0;
+
+    document.getElementById("labor-hours").value =
+        produto.horasMaoDeObra || 0;
 
     const campoCustoExtra =
         document.getElementById("extra-cost");
