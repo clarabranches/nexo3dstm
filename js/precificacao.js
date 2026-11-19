@@ -50,13 +50,19 @@ export function calcularCustoMaquina(
  * CUSTO DA MÃO DE OBRA
  * ============================================================
  *
- * Mão de obra/hora × horas de impressão
+ * Mão de obra/hora × horas de trabalho humano
+ * (preparo do arquivo, setup da impressora, remoção de
+ * suportes, pós-processamento, embalagem, etc.)
+ *
+ * Importante: NÃO usa as horas de impressão — esse tempo é
+ * majoritariamente a máquina rodando sozinha e já é
+ * contabilizado em calcularCustoMaquina.
  *
  */
 
 export function calcularMaoDeObra(
     configuracoes,
-    horas
+    horasMaoDeObra
 ) {
 
     const maoDeObraHora =
@@ -66,7 +72,7 @@ export function calcularMaoDeObra(
 
 
     const tempo =
-        numero(horas);
+        numero(horasMaoDeObra);
 
 
     return (
@@ -264,6 +270,12 @@ export function calcularProduto(
         );
 
 
+    const horasMaoDeObra =
+        numero(
+            dados.horasMaoDeObra
+        );
+
+
     const custoMaquina =
         calcularCustoMaquina(
             configuracoes,
@@ -274,7 +286,7 @@ export function calcularProduto(
     const maoDeObra =
         calcularMaoDeObra(
             configuracoes,
-            horas
+            horasMaoDeObra
         );
 
 
